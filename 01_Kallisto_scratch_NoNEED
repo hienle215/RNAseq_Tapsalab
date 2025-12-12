@@ -1,0 +1,21 @@
+### install kallisto in LINUX/TCSC
+
+wget https://github.com/pachterlab/kallisto/releases/download/v0.51.1/kallisto_linux-v0.51.1.tar.gz
+
+tar -xzvf kallisto_linux-v0.51.1.tar.gz
+
+
+### upload data from local laptop to TCSC via win scp
+
+### download reference and build up the index
+wget ftp://ftp.ensembl.org/pub/current_fasta/homo_sapiens/cdna/Homo_sapiens.GRCh38.cdna.all.fa.gz
+gunzip Homo_sapiens.GRCh38.cdna.all.fa.gz
+
+### making the index: it require the big ram for making index (8 GB)
+# can use kallisto in everywhere
+export PATH=$PATH:/home/leh/kallisto
+kallisto index -i /home/leh/input_ref/human_transcripts.idx /home/leh/input_ref/Homo_sapiens.GRCh38.cdna.all.fa
+
+### Kallisto command
+### since
+
