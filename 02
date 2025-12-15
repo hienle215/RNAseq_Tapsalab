@@ -1,1 +1,12 @@
 module load bio/kallisto/0.51.1-gompi-2023b
+
+## checking AGR2 in gencode
+zgrep -i AGR2 gencode.v48.transcripts.fa.gz
+
+ zgrep -i AGR2 gencode.v48.transcripts.fa.gz
+
+ zcat gencode.v48.transcripts.fa.gz | \
+awk '
+  /^>/ {p = ($0 ~ /ENST00000412973\.1/)}
+  p
+'
