@@ -1,3 +1,5 @@
+cd /scratch/svc_td_mbcpg/projects/HanaL/input
+
 module load bio/kallisto/0.51.1-gompi-2023b
 
 ## checking AGR2 in gencode
