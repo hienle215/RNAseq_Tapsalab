@@ -1,0 +1,112 @@
+#!/bin/bash -l
+#SBATCH -J kallisto_quant
+#SBATCH --partition=small
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem-per-cpu=4G
+#SBATCH --time=15:00:00
+#SBATCH --array=1-9
+#SBATCH --constraint=skylake
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=hien.le@tuni.fi
+
+set -euo pipefail
+
+#------------------------- Paths -------------------------#
+TRIMMED_DIR="/scratch/svc_td_mbpcg/projects/HanaL/cell_line_del"
+OUTPUT_DIR="/scratch/svc_td_mbpcg/projects/HanaL/cell_line_del/output_filteredAGR2"
+LOG_DIR="/scratch/svc_td_mbpcg/projects/HanaL/cell_line_del"
+KALLISTO_INDEX="/scratch/svc_td_mbpcg/projects/HanaL/input/reference_hg38/gencode_v48_filtered.idx"
+
+# Create output and logs directories
+mkdir -p "${OUTPUT_DIR}"
+mkdir -p "${LOG_DIR}"
+
+
+#------------------------- Modules -----------------------#
+module purge
+module load bio/kallisto/0.51.1-gompi-2023b
+
+
+#------------------------- Sample List -------------------#
+# Create array of all trimmed R1 files (*_1.fq.gz)
+mapfile -t R1_FILES < <(find "${TRIMMED_DIR}" -name "*_1.fq.gz" | sort)
+
+NUM_SAMPLES=${#R1_FILES[@]}
+
+# Validate SLURM array index
+if [[ -z "${SLURM_ARRAY_TASK_ID}" ]]; then
+    echo "ERROR: SLURM_ARRAY_TASK_ID is not set"
+    exit 1
+fi
+
+if [[ ${SLURM_ARRAY_TASK_ID} -lt 1 || ${SLURM_ARRAY_TASK_ID} -gt ${NUM_SAMPLES} ]]; then
+    echo "ERROR: Array task ID ${SLURM_ARRAY_TASK_ID} out of range (1–${NUM_SAMPLES})"
+    exit 1
+fi
+
+# Convert 1-based SLURM index to 0-based Bash index
+IDX=$((SLURM_ARRAY_TASK_ID - 1))
+
+R1="${R1_FILES[$IDX]}"
+R2="${R1/_1.fq.gz/_2.fq.gz}"
+
+# Extract sample name
+SAMPLE_NAME=$(basename "${R1}" _1.fq.gz)
+
+# Output directory
+SAMPLE_OUTPUT="${OUTPUT_DIR}/${SAMPLE_NAME}"
+
+echo "=========================================="
+echo "Array task ID: ${SLURM_ARRAY_TASK_ID}"
+echo "Sample name: ${SAMPLE_NAME}"
+echo "Processing R1: ${R1}"
+echo "Processing R2: ${R2}"
+echo "Output directory: ${SAMPLE_OUTPUT}"
+echo "Kallisto index: ${KALLISTO_INDEX}"
+echo "=========================================="
+
+# Check if output already exists (skip if abundance.tsv exists)
+if [[ -f "${SAMPLE_OUTPUT}/abundance.tsv" ]]; then
+    echo "SKIPPING: Kallisto output already exists for ${SAMPLE_NAME}"
+    echo "  - ${SAMPLE_OUTPUT}/abundance.tsv"
+    echo "=========================================="
+    exit 0
+fi
+
+# Verify both trimmed files exist
+if [[ ! -f "${R1}" ]]; then
+    echo "ERROR: R1 file not found: ${R1}"
+    exit 1
+fi
+
+if [[ ! -f "${R2}" ]]; then
+    echo "ERROR: R2 file not found: ${R2}"
+    exit 1
+fi
+
+# Verify kallisto index exists
+if [[ ! -f "${KALLISTO_INDEX}" ]]; then
+    echo "ERROR: Kallisto index not found: ${KALLISTO_INDEX}"
+    exit 1
+fi
+
+#------------------------- Run Kallisto ------------------#
+echo "Starting kallisto quantification..."
+echo "Command: kallisto quant -i ${KALLISTO_INDEX} -o ${SAMPLE_OUTPUT} -b 100 -t 8 ${R1} ${R2}"
+echo ""
+
+kallisto quant \
+    -i "${KALLISTO_INDEX}" \
+    -o "${SAMPLE_OUTPUT}" \
+    -b 100 \
+    -t 8 \
+    "${R1}" "${R2}"
+
+echo ""
+echo "=========================================="
+echo "Kallisto quantification complete for ${SAMPLE_NAME}!"
+echo "Output saved in: ${SAMPLE_OUTPUT}"
+echo "Output files:"
+ls -lh "${SAMPLE_OUTPUT}"
+echo "=========================================="
