@@ -1,0 +1,16 @@
+#bash file
+# 1. Start with original GENCODE FASTA
+zcat gencode.v48.transcripts.fa.gz > gencode_v48.fa
+grep -v "ENST00000412973" gencode_v48.fa > gencode_v48_noAGR2.fa
+
+# 2. Append modified short transcript (with unique tag)
+cat AGR2-202-short.fa >> gencode_v48_noAGR2.fa
+
+# 3. Build new Kallisto index with bash
+module load bio/kallisto/0.51.1-gompi-2023b
+kallisto index -i gencode_v48_noAGR2.idx gencode_v48_noAGR2.fa
+
+# 4. Quantify your samples
+kallisto quant -i gencode_v48_with_short.idx -o output sample_R1.fastq.gz sample_R2.fastq.gz
+
+kallisto quant -i /scratch/svc_td_mbpcg/projects/HanaL/input/reference_hg38/AGR2_only.idx -o /scratch/svc_td_mbpcg/projects/HanaL/cell_line_del/AGR2_output del_4_1_1.fq.gz del_4_1_2.fq.gz
