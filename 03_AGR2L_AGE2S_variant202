@@ -1,0 +1,159 @@
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+# 1. Sample information
+# ==============================
+samples <- c(
+  "del_4_1","del_4_2","del_4_3",
+  "del_56_1","del_56_2","del_56_3",
+  "WT_24_1","WT_24_2","WT_24_3"
+)
+
+conditions <- c(
+  rep("del4", 3),
+  rep("del56", 3),
+  rep("WT", 3)
+)
+
+coldata <- data.frame(
+  row.names = samples,        # IMPORTANT
+  condition = factor(conditions, levels = c("WT","del4","del56"))
+)
+
+base_dir <- "C:/Users/leh/OneDrive - TUNI.fi/Documents/Data/del_long_AGR2"
+
+# ==============================
+# 2. Read kallisto abundance.tsv
+# ==============================
+counts_list <- list()
+tpm_list    <- list()
+
+for (s in samples) {
+  file <- file.path(base_dir, s, "abundance.tsv")
+  df <- read.delim(file, stringsAsFactors = FALSE)
+  
+  # store transcript IDs once
+  if (!exists("transcripts")) {
+    transcripts <- df$target_id
+  }
+  
+  # store raw estimated counts (rounded integers) for DESeq2
+  counts_list[[s]] <- round(df$est_counts)
+  
+  # store TPMs for visualization if needed
+  tpm_list[[s]] <- df$tpm
+}
+
+# build counts matrix
+counts <- do.call(cbind, counts_list)
+rownames(counts) <- transcripts
+colnames(counts) <- samples
+
+# build TPM matrix for visualization
+tpm <- do.call(cbind, tpm_list)
+rownames(tpm) <- transcripts
+colnames(tpm) <- samples
+
+
+# replace last row of TPM for visualization
+tpm[nrow(tpm), ] <- round(c(137.215, 96.7546, 98.2533, 76.951, 88.342, 105.197, 48.2918, 40.6366, 37.2001))
+counts[nrow(counts), ] <- round(c(137.215, 96.7546, 98.2533, 76.951, 88.342, 105.197, 48.2918, 40.6366, 37.2001))
+# ==============================
+# 3. Now counts and TPM are ready
+# You can run DESeq2 next on 'counts'
+# ==============================
+library(DESeq2)
+
+dds <- DESeqDataSetFromMatrix(
+  countData = counts,  # **raw counts**
+  colData   = coldata,
+  design    = ~ condition
+)
+
+dds <- DESeq(dds)
+
+#------------extracting data-------------------------------------------------------------------------------------
+# Normalized expression per sample
+norm_counts <- counts(dds, normalized = TRUE)
+
+# Extract AGR2 variants
+agr2_df <- norm_counts[agr2_ids, , drop = FALSE] %>%
+  as.data.frame() %>%
+  tibble::rownames_to_column("variant") %>%
+  pivot_longer(
+    cols = -variant,
+    names_to = "sample",
+    values_to = "expr"
+  ) %>%
+  left_join(
+    coldata %>% tibble::rownames_to_column("sample"),
+    by = "sample"
+  ) %>%
+  mutate(
+    variant = case_when(
+      grepl("AGR2_custom-202short", variant) ~ "AGR2-202S",
+      grepl("AGR2-202\\|", variant) ~ "AGR2-202L"
+    ),
+    condition = factor(condition, levels = c("WT","del4","del56"))
+  )
+##----------------------------summarize for bar heigth-----------------------------------------------------------
+agr2_summary <- agr2_df %>%
+  group_by(condition, variant) %>%
+  summarise(
+    mean_expr = mean(expr),
+    sd_expr   = sd(expr),
+    max_expr  = max(expr),
+    .groups = "drop"
+  )
+###----------------------extract DESeq2 p-values (the comparision)---------------------------------------------------
+res_del4  <- results(dds, contrast = c("condition","del4","WT"))
+res_del56 <- results(dds, contrast = c("condition","del56","WT"))
+
+pvals <- data.frame(
+  condition = c("del4","del56","del4","del56"),
+  variant   = rep(c("AGR2-202L","AGR2-202S"), each = 2),
+  padj = c(
+    res_del4[agr2_ids,  "padj"],
+    res_del56[agr2_ids, "padj"]
+  )
+) %>%
+  left_join(agr2_summary, by = c("condition","variant")) %>%
+  mutate(
+    label = case_when(
+      padj < 0.001 ~ "***",
+      padj < 0.01  ~ "**",
+      padj < 0.05  ~ "*",
+      TRUE ~ "ns"
+    ),
+    y.position = max_expr * 1.1
+  )
+###--------------------------plot expression and p values--------------------------------------------------------------
+dodge <- position_dodge(width = 0.7)
+
+ggplot(agr2_summary, aes(x = condition, y = mean_expr, fill = variant)) +
+  geom_bar(stat = "identity", position = dodge, width = 0.6, alpha = 0.85) +
+  geom_errorbar(
+    aes(ymin = mean_expr - sd_expr, ymax = mean_expr + sd_expr),
+    position = dodge, width = 0.2
+  ) +
+  geom_jitter(
+    data = agr2_df,
+    aes(x = condition, y = expr, color = variant),
+    position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.7),
+    size = 2, show.legend = FALSE
+  ) +
+  geom_text(
+    data = pvals,
+    aes(x = condition, y = y.position, label = label, group = variant),
+    inherit.aes = FALSE,
+    position = dodge,
+    size = 5
+  ) +
+  scale_fill_brewer(palette = "Set2", name = "Variant") +
+  scale_color_brewer(palette = "Set2") +
+  theme_minimal(base_size = 14) +
+  labs(
+    y = "Normalized counts",
+    x = "Condition",
+    title = "AGR2 isoform expression"
+  )+ theme_classic()
