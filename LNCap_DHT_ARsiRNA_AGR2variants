@@ -137,7 +137,8 @@ agr2_summary <- agr2_df %>%
 # 7. DESeq2 p-values
 # ==============================
 res_AR  <- results(dds, contrast = c("condition","LN_AR","LN_NC"))
-res_10 <- results(dds, contrast = c("condition","LN_10","LN_NC"))
+res_10  <- results(dds, contrast = c("condition","LN_10","LN_NC"))
+res_0   <- results(dds, contrast = c("condition","LN_0","LN_NC"))  # <-- add this
 
 pvals <- bind_rows(
   tibble(
@@ -149,6 +150,11 @@ pvals <- bind_rows(
     transcript = agr2_variant_map$transcript,
     condition  = "LN_10",
     padj       = res_10[agr2_variant_map$transcript, "padj"]
+  ),
+  tibble(
+    transcript = agr2_variant_map$transcript,
+    condition  = "LN_0",
+    padj       = res_0[agr2_variant_map$transcript, "padj"]
   )
 ) %>%
   left_join(agr2_variant_map, by = "transcript") %>%
