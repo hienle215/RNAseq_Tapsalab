@@ -1,0 +1,279 @@
+###--------------------------------------------------Loading samples for near---------------------------------------------------------------------
+library(ggplot2)
+library(dplyr)
+
+# Prepare the data
+library(ggplot2)
+library(dplyr)
+
+# Prepare the data
+data1 <- data.frame(
+  pair = rep(c(" Luc", "EPCART_near"), each = 6),
+  treatment = rep(c(" K", "Dox_K"), times = 3),
+  value = c(
+    0.840339967, 0.981131081, 1.212880313, 0.969277787, 0.91298967, 0.928447035,
+    54.62, 41.77, 51.28, 144.959905, 127.7835163, 116.9212726
+  )
+)
+
+# Summarize
+summary_data1 <- data1 %>%
+  group_by(pair, treatment) %>%
+  summarise(
+    mean = mean(value),
+    se = sd(value)/sqrt(n()),
+    .groups = "drop"
+  )
+
+# Example p-values
+p_values1 <- data.frame(
+  pair = c(" Luc", "EPCART_near"),
+  treatment1 = c(" K", " K"),
+  treatment2 = c("Dox_K", "Dox_K"),
+  p = c(0.45, 0.03)
+)
+
+# Define dodge width
+dodge_width <- 0.7
+
+# Plot
+near = ggplot(summary_data1, aes(x = pair, y = mean, fill = treatment)) +
+  geom_bar(stat = "identity", position = position_dodge(width = dodge_width), width = 0.6, color="black") +
+  geom_errorbar(aes(ymin = mean - se, ymax = mean + se),
+                width = 0.2,
+                position = position_dodge(width = dodge_width)) +
+  theme_minimal() +
+  labs(y = "Fold change", x = "Group") +
+  scale_fill_manual(values = c("skyblue", "orange")) +
+  # p-values above bars
+  geom_text(data = p_values1,
+            aes(x = pair, y = max(summary_data1$mean) + 10, 
+                label = paste0("p = ", p)),
+            inherit.aes = FALSE, vjust = 0, 
+            position = position_dodge(width = dodge_width)) + theme_classic()
+setwd("C:/Users/leh/OneDrive - TUNI.fi/Desktop/lncRNA_prostate_cancer/AGR2-202")
+
+ggexport(near,filename = "EPCART_near_virus_LNCap.tiff",
+         width = 2000, # 7 inch max width 2100
+         height = 1800, 
+         res = 300)
+
+###----------------------------------------------Load sample for far---------------------------------------------------------------------------------
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+data2 <- data.frame(
+  group = c(
+    "Luc_2_K", "Luc_2_Dox_K",
+    "EPCART_far_1_K", "EPCART_far_1_Dox_K",
+    "EPCART_far_2_K", "EPCART_far_2_Dox_K"
+  ),
+  V1 = c(0.840339967, 0.969277787, 11.27631128, 29.14, 11.96738906, 22.72996602),
+  V2 = c(0.981131081, 0.91298967, 12.36358763, 29.37, 11.74135718, 23.81505513),
+  V3 = c(1.212880313, 0.928447035, 11.33673331, 27.64, 11.14697848, 23.58846904)
+)
+
+# Trim group names
+data2$group <- trimws(data2$group)
+
+# Convert to long format
+data_long2 <- data2 %>%
+  pivot_longer(cols = V1:V3, names_to = "replicate", values_to = "value") %>%
+  mutate(
+    # Clean pair names
+    pair = case_when(
+      grepl("Luc", group) ~ "Luc",
+      grepl("far_1", group) ~ "EPCART_far_1",
+      grepl("far_2", group) ~ "EPCART_far_2"
+    ),
+    treatment = ifelse(grepl("Dox", group), "Dox_K", "K")
+  )
+
+# Make pair and treatment factors for proper ordering
+data_long2 <- data_long2 %>%
+  mutate(
+    pair = factor(pair, levels = c("Luc", "EPCART_far_1", "EPCART_far_2")),
+    treatment = factor(treatment, levels = c("K", "Dox_K"))
+  )
+
+# Summarize
+summary_data2 <- data_long2 %>%
+  group_by(pair, treatment) %>%
+  summarise(
+    mean = mean(value),
+    sd = sd(value),
+    .groups = "drop"
+  )
+
+# P-values
+p_values2 <- data.frame(
+  pair = c("Luc", "EPCART_far_1", "EPCART_far_2"),
+  p = c(0.45, 0.03, 0.02)
+)
+
+# Convert pair to factor in p-values
+p_values2$pair <- factor(p_values2$pair, levels = c("Luc", "EPCART_far_1", "EPCART_far_2"))
+
+# Plot
+dodge_width <- 0.6
+far = ggplot(summary_data2, aes(x = pair, y = mean, fill = treatment)) +
+  geom_bar(stat = "identity", position = position_dodge(width = dodge_width), width = 0.5, color = "black") +
+  geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),
+                width = 0.2,
+                position = position_dodge(width = dodge_width)) +
+  geom_jitter(data = data_long2, aes(x = pair, y = value, color = treatment),
+              position = position_jitterdodge(jitter.width = 0.15, dodge.width = dodge_width),
+              size = 2, inherit.aes = FALSE) +
+  geom_text(data = p_values2,
+            aes(x = pair, y = max(summary_data2$mean + summary_data2$sd) + 2,
+                label = paste0("p = ", p)),
+            inherit.aes = FALSE, vjust = 0) +
+  scale_fill_manual(values = c("K" = "skyblue", "Dox_K" = "orange")) +
+  scale_color_manual(values = c("K" = "skyblue", "Dox_K" = "orange")) +
+  labs(y = "Value", x = "Group", fill = "Treatment", color = "Treatment") +
+  theme_classic()
+ggexport(far,filename = "EPCART_far_virus_LNCap.tiff",
+         width = 2500, # 7 inch max width 2100
+         height = 1800, 
+         res = 300)
+###----------------------------------------------Load sample for main---------------------------------------------------------------------------------
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+# Create the data
+data_main3 <- data.frame(
+  group = c(
+    "Luc_2_K", "Luc_2_Dox_K",
+    "EPCART_main_0.5_A", "EPCART_main_0.5_Dox_A",
+    "EPCART_main_1_A", "EPCART_main_1_Dox_A",
+    "EPCART_main_2_A", "EPCART_main_2_Dox_A"
+  ),
+  V1 = c(0.840339967, 0.969277787, 1.715077416, 1.70844623, 0.941479751, 1.307121867, 0.975948075, 2.396162096),
+  V2 = c(0.981131081, 0.91298967, 1.521618236, 1.816668724, 0.792740183, 1.474687227, 0.95633571, 2.293568961),
+  V3 = c(1.212880313, 0.928447035, 1.84562676, 1.687981253, 0.966279494, 1.187055225, 1.098101628, 2.129260284)
+)
+
+# Convert to long format
+data_long3 <- data_main3 %>%
+  pivot_longer(cols = V1:V3, names_to = "replicate", values_to = "value") %>%
+  mutate(
+    # Extract pair/sample name
+    pair = case_when(
+      grepl("Luc", group) ~ "Luc_2",
+      grepl("main_0.5", group) ~ "EPCART_main_0.5",
+      grepl("main_1", group) ~ "EPCART_main_1",
+      grepl("main_2", group) ~ "EPCART_main_2"
+    ),
+    # Extract treatment
+    treatment = ifelse(grepl("Dox", group), "Dox_A", "A")
+  )
+
+# Set factor levels for ordering
+data_long3 <- data_long3 %>%
+  mutate(
+    pair = factor(pair, levels = c("Luc_2", "EPCART_main_0.5", "EPCART_main_1", "EPCART_main_2")),
+    treatment = factor(treatment, levels = c("A", "Dox_A"))
+  )
+summary_data3 <- data_long3 %>%
+  group_by(pair, treatment) %>%
+  summarise(
+    mean = mean(value),
+    sd = sd(value),
+    .groups = "drop"
+  )
+summary_data3 <- data_long3 %>%
+  group_by(pair, treatment) %>%
+  summarise(
+    mean = mean(value),
+    sd = sd(value),
+    .groups = "drop"
+  )
+p_values3 <- data.frame(
+  pair = factor(c("Luc_2", "EPCART_main_0.5", "EPCART_main_1", "EPCART_main_2"),
+                levels = c("Luc_2", "EPCART_main_0.5", "EPCART_main_1", "EPCART_main_2")),
+  p = c(0.45, 0.03, 0.02, 0.01)
+)
+dodge_width <- 0.6
+
+main = ggplot(summary_data3, aes(x = pair, y = mean, fill = treatment)) +
+  geom_bar(stat = "identity", position = position_dodge(width = dodge_width), width = 0.5, color = "black") +
+  geom_errorbar(aes(ymin = mean - sd, ymax = mean + sd),
+                width = 0.2, position = position_dodge(width = dodge_width)) +
+  geom_jitter(data = data_long3, aes(x = pair, y = value, color = treatment),
+              position = position_jitterdodge(jitter.width = 0.15, dodge.width = dodge_width),
+              size = 2, inherit.aes = FALSE) +
+  geom_text(data = p_values3,
+            aes(x = pair, y = max(summary_data$mean + summary_data$sd) + 0.5,
+                label = paste0("p = ", p)),
+            inherit.aes = FALSE, vjust = 0) +
+  scale_fill_manual(values = c("A" = "skyblue", "Dox_A" = "orange")) +
+  scale_color_manual(values = c("A" = "skyblue", "Dox_A" = "orange")) +
+  labs(y = "Value", x = "Sample", fill = "Treatment", color = "Treatment") +
+  theme_classic()
+ggexport(main,filename = "EPCART_main_virus_LNCap.tiff",
+         width = 3000, # 7 inch max width 2100
+         height = 1800, 
+         res = 300)
+
+###-----------------------------------------arrange images----------------------------------------------------------------------------
+library(readxl)
+library(dplyr)
+library(numform)
+library(ggpubr)
+library(caTools)
+library(randomForest)
+library(readxl)
+library(stringr)
+library(caret)
+library(gridExtra)
+library(cowplot)
+
+mytheme <- theme_classic(base_family='sans') + theme(axis.text.x = element_text(size=6, color = "black"),
+                                                     axis.text.y= element_text(size=6, color = "black"),
+                                                     axis.title.y = element_text(size=8, color = "black"),
+                                                     axis.title.x = element_text(size=8, color = "black"),
+                                                     legend.text = element_text( size = 4, color = "black"),
+                                                     legend.key.size = unit(2, 'mm'),
+                                                     legend.position = "top",
+                                                     legend.title = element_blank(),
+                                                     plot.title = element_text(hjust = 0.5, size = 8,face = "bold"),
+                                                     axis.line = element_line(colour = "black", linewidth=1/.pt),
+                                                     strip.text.x = element_text(size = 6),
+                                                     strip.text.y = element_text(size = 6),
+                                                     panel.background = element_rect(fill = 'White'),
+                                                     panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                                                     axis.title.x.top = element_text(color='#4daf4a',size=7), 
+                                                     axis.text.x.top = element_text(color='#4daf4a',size=6))
+palette <- c(GFDd = "#00b347", GFDp = "#005923",PGCd = "#6500ff", PGCp = "#ff6500")
+filler <- ggplot()
+library(gridExtra)
+library(ggplot2)
+
+top_row <- ggarrange(
+  near, far,
+  ncol = 2,
+  labels = c("A", "B"),
+  font.label = list(size = 16, face = "bold"),
+  label.x = 0.01,  # move label slightly right
+  label.y = 1       # top of each plot
+)
+
+# Combine top row with bottom row C
+figure_qc <- ggarrange(
+  top_row, main,
+  ncol = 1,
+  labels = c("", "C"),  # "" for top row (A,B already labeled), "C" for bottom
+  font.label = list(size = 16, face = "bold"),
+  label.x = 0.01,      # position C label horizontally
+  label.y = 1,         # top of bottom plot
+  heights = c(1, 1.2)  # make bottom row slightly taller if needed
+)
+
+
+ggexport(figure_qc,
+         filename = "EPCART_virus_LNCap.tiff",
+         width = 2500,  # pixels
+         height = 2700, # increased height to fit two rows
+         res = 300)
