@@ -131,7 +131,7 @@ far = ggplot(summary_data2, aes(x = pair, y = mean, fill = treatment)) +
             inherit.aes = FALSE, vjust = 0) +
   scale_fill_manual(values = c("K" = "skyblue", "Dox_K" = "orange")) +
   scale_color_manual(values = c("K" = "skyblue", "Dox_K" = "orange")) +
-  labs(y = "Value", x = "Group", fill = "Treatment", color = "Treatment") +
+  labs(y = "Fold change", x = "Group", fill = "Treatment", color = "Treatment") +
   theme_classic()
 ggexport(far,filename = "EPCART_far_virus_LNCap.tiff",
          width = 2500, # 7 inch max width 2100
@@ -210,7 +210,7 @@ main = ggplot(summary_data3, aes(x = pair, y = mean, fill = treatment)) +
             inherit.aes = FALSE, vjust = 0) +
   scale_fill_manual(values = c("A" = "skyblue", "Dox_A" = "orange")) +
   scale_color_manual(values = c("A" = "skyblue", "Dox_A" = "orange")) +
-  labs(y = "Value", x = "Sample", fill = "Treatment", color = "Treatment") +
+  labs(y = "Fold change", x = "Sample", fill = "Treatment", color = "Treatment") +
   theme_classic()
 ggexport(main,filename = "EPCART_main_virus_LNCap.tiff",
          width = 3000, # 7 inch max width 2100
