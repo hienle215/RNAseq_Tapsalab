@@ -1,0 +1,105 @@
+# ===============================
+# 1️⃣ Load Libraries
+# ===============================
+library(ggplot2)
+library(survival)
+library(survminer)
+library(corrplot)
+
+# ===============================
+# 2️⃣ Set Paths
+# ===============================
+# Folder with all abundance.csv files
+kallisto_folder <- "path_to_kallisto_files/"
+# Clinical data CSV
+clinical_file <- "path_to_clinical_file.csv"
+
+# ===============================
+# 3️⃣ Read Clinical Data
+# ===============================
+clinical_data <- read.csv(clinical_file, stringsAsFactors = FALSE)
+
+# ===============================
+# 4️⃣ Read All Kallisto Files & Extract Counts
+# ===============================
+# List abundance.csv files
+files <- list.files(path = kallisto_folder, pattern = "abundance.csv", full.names = TRUE)
+
+# Define transcripts
+transcripts <- c("AGR2-202L", "AGR2-202S", "AGR2-203")
+
+# Extract counts into a matrix
+counts_list <- lapply(files, function(f) {
+  d <- read.csv(f, stringsAsFactors = FALSE)
+  # Extract est_counts for the transcripts
+  sapply(transcripts, function(t) {
+    if(t %in% d$target_id) d$est_counts[d$target_id == t] else NA
+  })
+})
+
+counts_matrix <- do.call(cbind, counts_list)
+rownames(counts_matrix) <- transcripts
+colnames(counts_matrix) <- gsub(".*/|/abundance.csv", "", files)  # sample names from file paths
+
+# Optional: log-transform counts for correlation plots
+log_counts <- log1p(counts_matrix)
+
+# ===============================
+# 5️⃣ Correlation Analysis
+# ===============================
+# Correlation matrix
+cor_mat <- cor(t(log_counts), use = "pairwise.complete.obs")
+
+# Print correlation matrix
+print(cor_mat)
+
+# Scatter plots
+pairs(log_counts,
+      main="Correlation between AGR2 transcripts",
+      pch=19, col="blue")
+
+# Correlation heatmap
+corrplot(cor_mat, method="circle", type="upper")
+
+# ===============================
+# 6️⃣ Merge Expression with Clinical Data
+# ===============================
+# Make sure sample names match clinical data
+# Example: clinical_data$Sample_code matches colnames(counts_matrix)
+expr_df <- data.frame(t(counts_matrix))
+expr_df$Sample_code <- rownames(expr_df)
+clinical_merged <- merge(clinical_data, expr_df, by = "Sample_code")
+
+# ===============================
+# 7️⃣ Kaplan-Meier Plots
+# ===============================
+# Function to create KM plot for a given transcript
+plot_KM <- function(df, transcript, cutoff="median") {
+  expr <- df[[transcript]]
+  
+  # Define high/low groups
+  if(cutoff == "median") {
+    df$group <- ifelse(expr > median(expr, na.rm = TRUE), "High", "Low")
+  } else if(cutoff == "quartile") {
+    q <- quantile(expr, probs=c(0.25,0.75), na.rm=TRUE)
+    df$group <- ifelse(expr <= q[1], "Low",
+                       ifelse(expr >= q[2], "High", NA))
+  }
+  
+  # Surv object
+  surv_obj <- Surv(time = df$progression_free_months, event = df$Progression)
+  fit <- survfit(surv_obj ~ group, data = df)
+  
+  # Plot
+  ggsurvplot(fit,
+             data = df,
+             risk.table = TRUE,
+             pval = TRUE,
+             palette = c("blue", "red"),
+             title = paste("Progression-Free Survival:", transcript))
+}
+
+# Plot KM for each transcript
+plot_KM(clinical_merged, "AGR2-202L")
+plot_KM(clinical_merged, "AGR2-202S")
+plot_KM(clinical_merged, "AGR2-203")
