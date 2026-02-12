@@ -21,7 +21,7 @@ clinical_data <- read_excel(clinical_file)
 #  Read All Kallisto Files & Extract Counts
 # =====================================================================================================================================================================================================================================================================================================================================================
 # List abundance.csv files
-kallisto_folder <- "C:/Users/leh/OneDrive - TUNI.fi/Documents/Data/PC_Cohort/outputs"
+kallisto_folder <- "C:/Users/leh/OneDrive - TUNI.fi/Documents/Data/PC_Cohort/output"
 patient_folders <- list.dirs(kallisto_folder, recursive = FALSE)
 kallisto_files <- file.path(patient_folders, "abundance.tsv")
 kallisto_files <- kallisto_files[file.exists(kallisto_files)]
@@ -36,7 +36,7 @@ names(kallisto_data) <- kallisto_samples
 ###=====================================================================================================================================================================================================================================================================================================================================================
 # Create est_counts matrix for all transcripts × all samples
 est_counts <- do.call(cbind, lapply(kallisto_data, function(df) df$est_counts))
-rownames(est_counts) <- kallisto_data[[1]]$target_id # Set rownames (transcript IDs) and colnames (samples)
+rownames(est_counts) <- kallisto_data[[1]]$target_id # Set rownames (transcript IDs) and colnames (samples) # error here
 colnames(est_counts) <- kallisto_samples
 head(est_counts[, 1:6])
 
@@ -85,24 +85,18 @@ library(ggplot2)
 library(tidyr)
 
 df <- as.data.frame(agr2_t)
-r_value <- cor(df_log$`AGR2-202L`,
-               df_log$`AGR2-202S`)
-a = ggplot(df_log, aes(x = AGR2_202L, y = AGR2_202S)) +
-  geom_point(color = "lightblue", size = 2) +
-  geom_smooth(method = "lm", se = FALSE, color = "darkblue") +
-  annotate("text",
-           x = Inf, y = -Inf,
-           label = paste0("R = ", round(r_value, 3)),
-           hjust = 1.1, vjust = -0.5,
-           size = 5) +
-  labs(title = "AGR2-202L vs AGR2-202S",
-       x = "AGR2-202L (log2)",
-       y = "AGR2-202S (log2)") +
-  theme_bw()
 
-r_value_1 <- cor(df_log$`AGR2-202L`,
-               df_log$`AGR2-203`)
-b = ggplot(df_log, aes(x = AGR2_202L, y = AGR2_203)) +
+df$`AGR2-202L_log` <- log2(df$`AGR2-202L` + 1)
+df$`AGR2-202S_log` <- log2(df$`AGR2-202S` + 1)
+df$`AGR2-203_log` <- log2(df$`AGR2-203` + 1)
+
+# Calculate correlation
+r_value_1 <- cor(df$`AGR2-202L_log`, df$`AGR2-202S_log`)
+r_value_2 <- cor(df$`AGR2-202L_log`, df$`AGR2-203_log`)
+r_value_3 <- cor(df$`AGR2-202S_log`, df$`AGR2-203_log`)
+
+# Scatter plot with regression line and correlation annotation between AGR2-202L and AGR2-202S
+a = ggplot(df, aes(x = `AGR2-202L_log`, y = `AGR2-202S_log`)) +
   geom_point(color = "lightblue", size = 2) +
   geom_smooth(method = "lm", se = FALSE, color = "darkblue") +
   annotate("text",
@@ -110,102 +104,496 @@ b = ggplot(df_log, aes(x = AGR2_202L, y = AGR2_203)) +
            label = paste0("R = ", round(r_value_1, 3)),
            hjust = 1.1, vjust = -0.5,
            size = 5) +
+  labs(title = "AGR2-202L vs AGR2-202S",
+       x = "AGR2-202L (log2)",
+       y = "AGR2-202S (log2)") +
+  theme_bw()
+
+# Scatter plot with regression line and correlation annotation between AGR2-202L and AGR2-203
+b = ggplot(df, aes(x = `AGR2-202L_log`, y = `AGR2-203_log`)) +
+  geom_point(color = "lightblue", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "darkblue") +
+  annotate("text",
+           x = Inf, y = -Inf,
+           label = paste0("R = ", round(r_value_2, 3)),
+           hjust = 1.1, vjust = -0.5,
+           size = 5) +
   labs(title = "AGR2-202L vs AGR2-203",
        x = "AGR2-202L (log2)",
        y = "AGR2-203 (log2)") +
   theme_bw()
 
+# Scatter plot with regression line and correlation annotation between AGR2-202S and AGR2-203
+c = ggplot(df, aes(x = `AGR2-202S_log`, y = `AGR2-203_log`)) +
+  geom_point(color = "lightblue", size = 2) +
+  geom_smooth(method = "lm", se = FALSE, color = "darkblue") +
+  annotate("text",
+           x = Inf, y = -Inf,
+           label = paste0("R = ", round(r_value_2, 3)),
+           hjust = 1.1, vjust = -0.5,
+           size = 5) +
+  labs(title = "AGR2-202S vs AGR2-203",
+       x = "AGR2-202S (log2)",
+       y = "AGR2-203 (log2)") +
+  theme_bw()
 
+#10. Arrange the images
+# =======================================================================================================================================================================================================================================================================================================================================================
+library(readxl)
+library(dplyr)
+library(numform)
+library(ggpubr)
+library(caTools)
+library(randomForest)
+library(readxl)
+library(stringr)
+library(caret)
+library(gridExtra)
+library(cowplot)
 
+mytheme <- theme_classic(base_family='sans') + theme(axis.text.x = element_text(size=6, color = "black"),
+                                                     axis.text.y= element_text(size=6, color = "black"),
+                                                     axis.title.y = element_text(size=8, color = "black"),
+                                                     axis.title.x = element_text(size=8, color = "black"),
+                                                     legend.text = element_text( size = 4, color = "black"),
+                                                     legend.key.size = unit(2, 'mm'),
+                                                     legend.position = "top",
+                                                     legend.title = element_blank(),
+                                                     plot.title = element_text(hjust = 0.5, size = 8,face = "bold"),
+                                                     axis.line = element_line(colour = "black", linewidth=1/.pt),
+                                                     strip.text.x = element_text(size = 6),
+                                                     strip.text.y = element_text(size = 6),
+                                                     panel.background = element_rect(fill = 'White'),
+                                                     panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
+                                                     axis.title.x.top = element_text(color='#4daf4a',size=7), 
+                                                     axis.text.x.top = element_text(color='#4daf4a',size=6))
+palette <- c(GFDd = "#00b347", GFDp = "#005923",PGCd = "#6500ff", PGCp = "#ff6500")
+filler <- ggplot()
+library(gridExtra)
+library(ggplot2)
 
+figure_qc <- ggarrange(
+  a,b,c,
+  ncol = 3,
+  labels = c("A", "B", "C"),
+  font.label = list(size = 16, face = "bold"),
+  align = "v"
+)
+setwd("C:/Users/leh/OneDrive - TUNI.fi/Desktop/lncRNA_prostate_cancer/AGR2-202")
 
+ggexport(figure_qc,filename = "Correlation_PC_cohort.tiff",
+         width = 3200, # 7 inch max width 2100
+         height = 1000, 
+         res = 300)
 
-
-
-
-
-
-
-
-
-colnames(kallisto_data)
-clinical = clinical %>% filter(Sample_code %in% colnames(kallisto_data))
-
-# Define transcripts
-transcripts <- c("AGR2-202L", "AGR2-202S", "AGR2-203")
-
-# Extract counts into a matrix
-counts_list <- lapply(files, function(f) {
-  d <- read.csv(f, stringsAsFactors = FALSE)
-  # Extract est_counts for the transcripts
-  sapply(transcripts, function(t) {
-    if(t %in% d$target_id) d$est_counts[d$target_id == t] else NA
-  })
-})
-
-counts_matrix <- do.call(cbind, counts_list)
-rownames(counts_matrix) <- transcripts
-colnames(counts_matrix) <- gsub(".*/|/abundance.csv", "", files)  # sample names from file paths
-
-# Optional: log-transform counts for correlation plots
-log_counts <- log1p(counts_matrix)
-
-# =====================================================================================================================================================================================================================================================================================================================================================
-# 5️⃣ Correlation Analysis
-# =====================================================================================================================================================================================================================================================================================================================================================
-# Correlation matrix
-cor_mat <- cor(t(log_counts), use = "pairwise.complete.obs")
-
-# Print correlation matrix
-print(cor_mat)
-
-# Scatter plots
-pairs(log_counts,
-      main="Correlation between AGR2 transcripts",
-      pch=19, col="blue")
-
-# Correlation heatmap
-corrplot(cor_mat, method="circle", type="upper")
-
-# =====================================================================================================================================================================================================================================================================================================================================================
-# 6️⃣ Merge Expression with Clinical Data
-# =====================================================================================================================================================================================================================================================================================================================================================
-# Make sure sample names match clinical data
-# Example: clinical_data$Sample_code matches colnames(counts_matrix)
-expr_df <- data.frame(t(counts_matrix))
-expr_df$Sample_code <- rownames(expr_df)
-clinical_merged <- merge(clinical_data, expr_df, by = "Sample_code")
-
-# =====================================================================================================================================================================================================================================================================================================================================================
 # 7️⃣ Kaplan-Meier Plots
 # =====================================================================================================================================================================================================================================================================================================================================================
-# Function to create KM plot for a given transcript
-plot_KM <- function(df, transcript, cutoff="median") {
-  expr <- df[[transcript]]
-  
-  # Define high/low groups
-  if(cutoff == "median") {
-    df$group <- ifelse(expr > median(expr, na.rm = TRUE), "High", "Low")
-  } else if(cutoff == "quartile") {
-    q <- quantile(expr, probs=c(0.25,0.75), na.rm=TRUE)
-    df$group <- ifelse(expr <= q[1], "Low",
-                       ifelse(expr >= q[2], "High", NA))
-  }
-  
-  # Surv object
-  surv_obj <- Surv(time = df$progression_free_months, event = df$Progression)
-  fit <- survfit(surv_obj ~ group, data = df)
-  
-  # Plot
-  ggsurvplot(fit,
-             data = df,
-             risk.table = TRUE,
-             pval = TRUE,
-             palette = c("blue", "red"),
-             title = paste("Progression-Free Survival:", transcript))
-}
+# Create a new column with the cleaned sample IDs
+df$samples_new_id <- gsub("^A", "", df$samples)
+df <- df %>%
+  mutate(samples_new_id = gsub("_", "-", samples_new_id))
+# Check the result
+head(df$samples_new_id)
 
-# Plot KM for each transcript
-plot_KM(clinical_merged, "AGR2-202L")
-plot_KM(clinical_merged, "AGR2-202S")
-plot_KM(clinical_merged, "AGR2-203")
+# Merge df with clinical_data
+merged_data <- df %>% inner_join(clinical_data, by = c("samples_new_id" = "Sample_code"))
+dim(merged_data)
+
+grep("AGR2.*203.*log", colnames(merged_data), value = TRUE)
+merged_data <- merged_data %>%
+  rename(
+    AGR2_203_log = `AGR2-203_log`,
+    AGR2_202L_log = `AGR2-202L_log`,
+    AGR2_202S_log = `AGR2-202S_log`
+  )
+merged_data <- merged_data %>%
+  mutate(
+    AGR2_203_log_group = ifelse(
+      `AGR2-203` > median(`AGR2-203`, na.rm = TRUE),
+      "High", "Low"
+    )
+  )
+km_data <- merged_data %>%
+  filter(
+    !is.na(AGR2_203_log_group),
+    !is.na(progression_free_months),
+    !is.na(Progression)
+  )
+surv_obj <- Surv(time = km_data$progression_free_months, event = km_data$Progression)
+
+fit <- survfit(surv_obj ~ AGR2_203_log_group, data = km_data)
+
+AGR2_203 = ggsurvplot(
+  fit,
+  data = km_data,
+  pval = TRUE,
+  risk.table = TRUE,
+  palette = c("blue", "red"),
+  xlab = "Progression-Free Months",
+  ylab = "Progression-Free Survival Probability",
+  legend.title = "AGR2-203_log",
+  legend.labs = c("Low", "High")
+)
+
+###---------------------------data for AGR2-202L-----------------------------------------------------------------------------
+merged_data <- merged_data %>%
+  mutate(
+    AGR2_202L_log_group = ifelse(
+      AGR2_202L_log > median(AGR2_202L_log, na.rm = TRUE),
+      "High", "Low"
+    )
+  )
+km_data <- merged_data %>%
+  filter(
+    !is.na(AGR2_202L_log_group),
+    !is.na(progression_free_months),
+    !is.na(Progression)
+  )
+surv_obj <- Surv(time = km_data$progression_free_months, event = km_data$Progression)
+fit <- survfit(surv_obj ~ AGR2_202L_log_group, data = km_data)
+AGR2_202L_plot <- ggsurvplot(
+  fit,
+  data = km_data,
+  pval = TRUE,
+  risk.table = TRUE,
+  palette = c("blue", "red"),  # Low = blue, High = red
+  xlab = "Progression-Free Months",
+  ylab = "Progression-Free Survival Probability",
+  legend.title = "AGR2-202L_log",
+  legend.labs = c("Low", "High")
+)
+
+AGR2_202L_plot
+
+###---------------------------data for AGR2-202S-----------------------------------------------------------------------------
+merged_data <- merged_data %>%
+  mutate(
+    AGR2_202S_log_group = ifelse(
+      AGR2_202S_log > median(AGR2_202S_log, na.rm = TRUE),
+      "High", "Low"
+    )
+  )
+km_data <- merged_data %>%
+  filter(
+    !is.na(AGR2_202S_log_group),
+    !is.na(progression_free_months),
+    !is.na(Progression)
+  )
+surv_obj <- Surv(time = km_data$progression_free_months, event = km_data$Progression)
+fit <- survfit(surv_obj ~ AGR2_202S_log_group, data = km_data)
+AGR2_202S_plot <- ggsurvplot(
+  fit,
+  data = km_data,
+  pval = TRUE,
+  risk.table = TRUE,
+  palette = c("blue", "red"),  # Low = blue, High = red
+  xlab = "Progression-Free Months",
+  ylab = "Progression-Free Survival Probability",
+  legend.title = "AGR2-202S_log",
+  legend.labs = c("Low", "High")
+)
+
+AGR2_202S_plot
+
+
+figure_qc_1 <- ggarrange(
+  AGR2_202L_plot$plot,
+  AGR2_202S_plot$plot,
+  AGR2_203$plot,
+  ncol = 3,
+  labels = c("A", "B", "C"),
+  font.label = list(size = 16, face = "bold"),
+  align = "v"
+)
+
+figure_qc_1
+ggexport(figure_qc_1,filename = "Kaplan_Meier_plots.tiff",
+         width = 3800, # 7 inch max width 2100
+         height = 1200, 
+         res = 300)
+
+figure_qc_2 <- arrange_ggsurvplots(
+  list(AGR2_202L_plot, AGR2_202S_plot, AGR2_203),
+  ncol = 3,
+  nrow = 1,
+  print = TRUE
+)
+ggexport(figure_qc_2,filename = "Kaplan_Meier_plots_2.tiff",
+         width = 4000, # 7 inch max width 2100
+         height = 1600, 
+         res = 300)
+
+# =====================================================================================================================================================================================================================================================================================================================================================
+# •	Multivariate Cox regression analysis
+# =====================================================================================================================================================================================================================================================================================================================================================
+###---------------------------------------------------------------Multivariate Cox regression for AGR2-203---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Convert Gleason_score to numeric (remove NAs if needed)
+library(dplyr)
+library(survival)
+library(survminer)
+
+# ----------------------------
+# 1. Create high/low group for AGR2-203 based on median raw expression
+# ----------------------------
+merged_data <- merged_data %>%
+  mutate(
+    AGR2_203_log_group = ifelse(
+      `AGR2-203` > median(`AGR2-203`, na.rm = TRUE),
+      "High", "Low"
+    )
+  )
+
+# ----------------------------
+# 2. Clean PSA and create PSA groups
+# ----------------------------
+merged_data <- merged_data %>%
+  mutate(
+    PSA_at_progression = as.numeric(na_if(PSA_at_progression, "NA")),  # convert "NA" strings to actual NA
+    PSA_group = cut(PSA_at_progression,
+                    breaks = c(-Inf, 10, 19.9, Inf),
+                    labels = c("≤10", "10-19.9", "≥20"))
+  )
+
+# ----------------------------
+# 3. Convert Gleason score to numeric and create groups
+# ----------------------------
+merged_data <- merged_data %>%
+  mutate(
+    Gleason_score = as.numeric(as.character(Gleason_score)),
+    Gleason_group = cut(Gleason_score,
+                        breaks = c(-Inf, 6, 7, Inf),
+                        labels = c("<7", "7", ">7"))
+  )
+
+# ----------------------------
+# 4. Ensure pT is a factor
+# ----------------------------
+merged_data$pT <- as.factor(merged_data$pT)
+
+# ----------------------------
+# 5. Filter for KM analysis
+# ----------------------------
+km_data <- merged_data %>%
+  filter(
+    !is.na(AGR2_203_log_group),
+    !is.na(progression_free_months),
+    !is.na(Progression)
+  )
+
+# ----------------------------
+# 6. Kaplan-Meier survival object & fit
+# ----------------------------
+surv_obj <- Surv(time = km_data$progression_free_months, event = km_data$Progression)
+fit <- survfit(surv_obj ~ AGR2_203_log_group, data = km_data)
+
+# ----------------------------
+# 7. KM plot
+# ----------------------------
+km_plot <- ggsurvplot(
+  fit,
+  data = km_data,
+  pval = TRUE,
+  risk.table = TRUE,
+  palette = c("blue", "red"),
+  xlab = "Progression-Free Months",
+  ylab = "Progression-Free Survival Probability",
+  legend.title = "AGR2-203",
+  legend.labs = c("Low", "High")
+)
+
+# Print KM plot
+km_plot
+
+# ----------------------------
+# 8. Multivariate Cox regression
+# ----------------------------
+cox_model <- coxph(surv_obj ~ AGR2_203_log_group + Age_at_diagnosis +
+                     PSA_group + Gleason_group + pT,
+                   data = merged_data)
+
+# ----------------------------
+# 9. View summary
+# ----------------------------
+summary(cox_model)
+
+# ----------------------------
+# 10. Forest plot
+# ----------------------------
+forest_plot <- ggforest(cox_model, data = merged_data,
+                        main = "Multivariate Cox regression for AGR2-203",
+                        cpositions = c(0.02, 0.22, 0.4),
+                        fontsize = 1,
+                        refLabel = "Reference")
+
+# Print forest plot
+forest_plot
+
+ggexport(forest_plot, filename = "Cox_analysis_AGR2_203_PCcohort.tiff", width = 3200, height = 2500, res = 300)
+
+###---------------------------------------------------------------Multivariate Cox regression for AGR2-202L---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+library(survival)
+library(survminer)
+library(dplyr)
+library(ggpubr)  # for ggexport
+
+# ----------------------------
+# 1. Prepare variables
+# ----------------------------
+
+# Divide AGR2-202L expression into High vs Low (median split)
+merged_data <- merged_data %>%
+  mutate(AGR2_202L_log_group = ifelse(AGR2_202L_log >= median(AGR2_202L_log, na.rm = TRUE),
+                                      "High", "Low"))
+
+# PSA categories
+merged_data <- merged_data %>%
+  mutate(PSA_group = cut(diagnostic_PSA,
+                         breaks = c(-Inf, 10, 19.9, Inf),
+                         labels = c("≤10", "10-19.9", "≥20")))
+
+# Convert Gleason_score to numeric (remove NAs if needed)
+merged_data$Gleason_score <- as.numeric(as.character(merged_data$Gleason_score))
+
+# Gleason score categories
+merged_data <- merged_data %>%
+  mutate(Gleason_group = cut(Gleason_score,
+                             breaks = c(-Inf, 6, 7, Inf),
+                             labels = c("<7", "7", ">7")))
+
+# Ensure pT is factor
+merged_data$pT <- as.factor(merged_data$pT)
+
+# ----------------------------
+# 2. Create survival object
+# ----------------------------
+surv_obj <- Surv(time = merged_data$progression_free_months,
+                 event = merged_data$Progression)
+
+# ----------------------------
+# 3. Multivariate Cox regression
+# ----------------------------
+cox_model <- coxph(surv_obj ~ AGR2_202L_log_group + Age_at_diagnosis +
+                   PSA_group + Gleason_group + pT,
+                   data = merged_data)
+
+# ----------------------------
+# 4. View summary
+# ----------------------------
+summary(cox_model)
+
+# ----------------------------
+# 5. Forest plot visualization
+# ----------------------------
+a <- ggforest(cox_model, data = merged_data,
+         main = "Multivariate Cox regression for AGR2-202L",
+         cpositions = c(0.02, 0.22, 0.4),
+         fontsize = 1,
+         refLabel = "Reference")
+
+# Export forest plot as TIFF
+ggexport(forest_plot, filename = "Cox_analysis_AGR2_202S_PCcohort.tiff", width = 3200, height = 2500, res = 300)
+
+###---------------------------------------------------------------Multivariate Cox regression for AGR2-202S---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+library(dplyr)
+library(survival)
+library(survminer)
+
+# ----------------------------
+# 1. Create high/low group for AGR2-202S based on median raw expression
+# ----------------------------
+merged_data <- merged_data %>%
+  mutate(
+    AGR2_202S_log_group = ifelse(
+      `AGR2-202S` > median(`AGR2-202S`, na.rm = TRUE),
+      "High", "Low"
+    )
+  )
+
+# ----------------------------
+# 2. Clean PSA and create PSA groups
+# ----------------------------
+merged_data <- merged_data %>%
+  mutate(
+    PSA_at_progression = as.numeric(na_if(PSA_at_progression, "NA")),  # convert "NA" strings to actual NA
+    PSA_group = cut(PSA_at_progression,
+                    breaks = c(-Inf, 10, 19.9, Inf),
+                    labels = c("≤10", "10-19.9", "≥20"))
+  )
+
+# ----------------------------
+# 3. Convert Gleason score to numeric and create groups
+# ----------------------------
+merged_data <- merged_data %>%
+  mutate(
+    Gleason_score = as.numeric(as.character(Gleason_score)),
+    Gleason_group = cut(Gleason_score,
+                        breaks = c(-Inf, 6, 7, Inf),
+                        labels = c("<7", "7", ">7"))
+  )
+
+# ----------------------------
+# 4. Ensure pT is a factor
+# ----------------------------
+merged_data$pT <- as.factor(merged_data$pT)
+
+# ----------------------------
+# 5. Filter for KM analysis
+# ----------------------------
+km_data <- merged_data %>%
+  filter(
+    !is.na(AGR2_202S_log_group),
+    !is.na(progression_free_months),
+    !is.na(Progression)
+  )
+
+# ----------------------------
+# 6. Kaplan-Meier survival object & fit
+# ----------------------------
+surv_obj <- Surv(time = km_data$progression_free_months, event = km_data$Progression)
+fit <- survfit(surv_obj ~ AGR2_202S_log_group, data = km_data)
+
+# ----------------------------
+# 7. KM plot
+# ----------------------------
+km_plot <- ggsurvplot(
+  fit,
+  data = km_data,
+  pval = TRUE,
+  risk.table = TRUE,
+  palette = c("blue", "red"),
+  xlab = "Progression-Free Months",
+  ylab = "Progression-Free Survival Probability",
+  legend.title = "AGR2-202S",
+  legend.labs = c("Low", "High")
+)
+
+# Print KM plot
+km_plot
+
+# ----------------------------
+# 8. Multivariate Cox regression
+# ----------------------------
+cox_model <- coxph(surv_obj ~ AGR2_202S_log_group + Age_at_diagnosis +
+                     PSA_group + Gleason_group + pT,
+                   data = merged_data)
+
+# ----------------------------
+# 9. View summary
+# ----------------------------
+summary(cox_model)
+
+# ----------------------------
+# 10. Forest plot
+# ----------------------------
+forest_plot <- ggforest(cox_model, data = merged_data,
+                        main = "Multivariate Cox regression for AGR2-202S",
+                        cpositions = c(0.02, 0.22, 0.4),
+                        fontsize = 1,
+                        refLabel = "Reference")
+
+# Print forest plot
+forest_plot
+
+# Optional: export plot
+# ggexport(forest_plot, filename = "Cox_analysis_AGR2_202S_PCcohort.tiff", width = 3200, height = 2500, res = 300)
+
