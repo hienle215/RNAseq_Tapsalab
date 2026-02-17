@@ -14,7 +14,7 @@ kallisto_folder <- "C:/Users/leh/OneDrive - TUNI.fi/Documents/Data/PC_Cohort/out
 
 # Clinical data excel file
 library(readxl)
-clinical_file <- "C:/Users/leh/OneDrive - TUNI.fi/Desktop/lncRNA_prostate_cancer/AGR2-202/RadicalProstatectomy_ClinicalData_RNAseq-samples_2021-05.xlsx"
+clinical_file <- "C:/Users/leh/OneDrive - TUNI.fi/Desktop/lncRNA_prostate_cancer/AGR2-202/RadicalProstatectomy_ClinicalData_RNAseq-samples_2021-05_modify.xlsx"
 clinical_data <- read_excel(clinical_file)
 
 # =====================================================================================================================================================================================================================================================================================================================================================
@@ -32,8 +32,6 @@ library(dplyr)
 kallisto_data <- lapply(kallisto_files, function(f) {
   read.table(f, header = TRUE, sep = "\t", stringsAsFactors = FALSE)})
 names(kallisto_data) <- kallisto_samples
-
-###=====================================================================================================================================================================================================================================================================================================================================================
 # Create est_counts matrix for all transcripts × all samples
 est_counts <- do.call(cbind, lapply(kallisto_data, function(df) df$est_counts))
 rownames(est_counts) <- kallisto_data[[1]]$target_id # Set rownames (transcript IDs) and colnames (samples) # error here
@@ -59,14 +57,23 @@ colnames(est_counts_s) <- kallisto_samples_s
 head(est_counts_s[, 1:6])
 
 # ======================================================================================================================================================================================================================================================================================================================================================
-#  merge matrix data for final
+#  merge matrix data for final and doing normalization
 # =======================================================================================================================================================================================================================================================================================================================================================
 est_counts[nrow(est_counts), ] <- est_counts_s[nrow(est_counts_s), ]
+count_mat <- as.matrix(est_counts)
+mode(count_mat) <- "numeric"
+library(DESeq2)
+dds <- DESeqDataSetFromMatrix(
+  countData = round(count_mat),   # IMPORTANT
+  colData   = data.frame(row.names = colnames(count_mat)),
+  design    = ~ 1) # desing = 1 it means no comparision, we do not have control group here
+dds <- estimateSizeFactors(dds)
+norm_counts <- counts(dds, normalized = TRUE)
 
 # ======================================================================================================================================================================================================================================================================================================================================================
 #  correlation expression of AGR2-202, AGR2-202-short, and AGR2-203
 # =======================================================================================================================================================================================================================================================================================================================================================
-variant_ids <- sapply(strsplit(rownames(est_counts), "\\|"), `[`, 5)
+variant_ids <- sapply(strsplit(rownames(norm_counts), "\\|"), `[`, 5)
 est_df <- as.data.frame(est_counts)
 est_df$variant <- variant_ids
 agr2_df <- est_df[est_df$variant %in% 
@@ -83,7 +90,6 @@ head(agr2_t)
 
 library(ggplot2)
 library(tidyr)
-
 df <- as.data.frame(agr2_t)
 
 df$`AGR2-202L_log` <- log2(df$`AGR2-202L` + 1)
@@ -188,113 +194,103 @@ ggexport(figure_qc,filename = "Correlation_PC_cohort.tiff",
 
 # 7️⃣ Kaplan-Meier Plots
 # =====================================================================================================================================================================================================================================================================================================================================================
-# Create a new column with the cleaned sample IDs
-df$samples_new_id <- gsub("^A", "", df$samples)
-df <- df %>%
-  mutate(samples_new_id = gsub("_", "-", samples_new_id))
-# Check the result
-head(df$samples_new_id)
 
-# Merge df with clinical_data
-merged_data <- df %>% inner_join(clinical_data, by = c("samples_new_id" = "Sample_code"))
+variant_ids <- sapply(strsplit(rownames(norm_counts), "\\|"), `[`, 5)
+est_df <- as.data.frame(norm_counts)
+est_df$variant <- variant_ids
+agr2_df <- est_df[est_df$variant %in% 
+                    c("AGR2-202", "AGR2-202-short", "AGR2-203"), ]
+table(agr2_df$variant)
+rownames(agr2_df) <- recode(agr2_df$variant,
+                            "AGR2-202" = "AGR2-202L",
+                            "AGR2-202-short" = "AGR2-202S",
+                            "AGR2-203" = "AGR2-203")
+agr2_df$variant <- NULL
+agr2_df["AGR2-202S", 1:5]
+agr2_t <- t(agr2_df)
+head(agr2_t)
+
+library(ggplot2)
+library(tidyr)
+
+df <- as.data.frame(agr2_t)
+# Create a new column with the cleaned sample IDs
+df$samples_new_id <- rownames(df)
+
+merged_data <- df %>%
+  inner_join(clinical_data, by = c("samples_new_id" = "Sample_code"))
 dim(merged_data)
 
-grep("AGR2.*203.*log", colnames(merged_data), value = TRUE)
-merged_data <- merged_data %>%
-  rename(
-    AGR2_203_log = `AGR2-203_log`,
-    AGR2_202L_log = `AGR2-202L_log`,
-    AGR2_202S_log = `AGR2-202S_log`
-  )
-merged_data <- merged_data %>%
-  mutate(
-    AGR2_203_log_group = ifelse(
-      `AGR2-203` > median(`AGR2-203`, na.rm = TRUE),
-      "High", "Low"
-    )
-  )
-km_data <- merged_data %>%
-  filter(
-    !is.na(AGR2_203_log_group),
-    !is.na(progression_free_months),
-    !is.na(Progression)
-  )
-surv_obj <- Surv(time = km_data$progression_free_months, event = km_data$Progression)
+# Example for AGR2-203
+merged_data_203 <- merged_data %>%
+  mutate(AGR2_203_group = ifelse(`AGR2-203` >= median(`AGR2-203`), "High", "Low"))
+library(survival)
+library(survminer)
+# Create a survival object
+surv_obj_203 <- Surv(time = merged_data_203$progression_free_months,
+                 event = merged_data_203$Progression)
+# Fit Kaplan-Meier curves
+fit_203 <- survfit(surv_obj_203 ~ AGR2_203_group, data = merged_data_203)
 
-fit <- survfit(surv_obj ~ AGR2_203_log_group, data = km_data)
+# Plot
+AGR2_203 = ggsurvplot(fit_203,
+           data = merged_data_203,
+           pval = TRUE,            # show p-value
+           risk.table = TRUE,      # show risk table
+           surv.median.line = "hv",
+           palette = c("blue", "red"), # Low=blue, High=red
+           xlab = "Progression-Free Months",
+           ylab = "Progression-Free Survival Probability")
 
-AGR2_203 = ggsurvplot(
-  fit,
-  data = km_data,
-  pval = TRUE,
-  risk.table = TRUE,
-  palette = c("blue", "red"),
-  xlab = "Progression-Free Months",
-  ylab = "Progression-Free Survival Probability",
-  legend.title = "AGR2-203_log",
-  legend.labs = c("Low", "High")
 )
 
 ###---------------------------data for AGR2-202L-----------------------------------------------------------------------------
-merged_data <- merged_data %>%
-  mutate(
-    AGR2_202L_log_group = ifelse(
-      AGR2_202L_log > median(AGR2_202L_log, na.rm = TRUE),
-      "High", "Low"
-    )
-  )
-km_data <- merged_data %>%
-  filter(
-    !is.na(AGR2_202L_log_group),
-    !is.na(progression_free_months),
-    !is.na(Progression)
-  )
-surv_obj <- Surv(time = km_data$progression_free_months, event = km_data$Progression)
-fit <- survfit(surv_obj ~ AGR2_202L_log_group, data = km_data)
+merged_data_202L <- merged_data %>%
+  mutate(AGR2_202L_group = ifelse(`AGR2-202L` >= median(`AGR2-202L`, na.rm = TRUE),
+                                 "High", "Low"))
+
+# Survival object
+surv_202L <- Surv(time  = merged_data_202L$progression_free_months,
+                  event = merged_data_202L$Progression)
+
+# Kaplan–Meier fit
+fit_202L <- survfit(surv_202L ~ AGR2_202L_group, data = merged_data_202L)
+
+# Plot (log-rank p-value included)
 AGR2_202L_plot <- ggsurvplot(
-  fit,
-  data = km_data,
-  pval = TRUE,
+  fit_202L,
+  data = merged_data_202L,
+  pval = TRUE,                 # log-rank test
   risk.table = TRUE,
   palette = c("blue", "red"),  # Low = blue, High = red
+  title = "Progression-Free Survival by AGR2-202L Expression",
   xlab = "Progression-Free Months",
-  ylab = "Progression-Free Survival Probability",
-  legend.title = "AGR2-202L_log",
-  legend.labs = c("Low", "High")
+  ylab = "Progression-Free Survival Probability"
 )
 
 AGR2_202L_plot
 
 ###---------------------------data for AGR2-202S-----------------------------------------------------------------------------
-merged_data <- merged_data %>%
-  mutate(
-    AGR2_202S_log_group = ifelse(
-      AGR2_202S_log > median(AGR2_202S_log, na.rm = TRUE),
-      "High", "Low"
-    )
-  )
-km_data <- merged_data %>%
-  filter(
-    !is.na(AGR2_202S_log_group),
-    !is.na(progression_free_months),
-    !is.na(Progression)
-  )
-surv_obj <- Surv(time = km_data$progression_free_months, event = km_data$Progression)
-fit <- survfit(surv_obj ~ AGR2_202S_log_group, data = km_data)
+merged_data_202S <- merged_data %>%
+  mutate(AGR2_202S_group = ifelse(`AGR2-202S` >= median(`AGR2-202S`, na.rm = TRUE),
+                                 "High", "Low"))
+surv_202S <- Surv(time  = merged_data_202S$progression_free_months,
+                  event = merged_data_202S$Progression)
+# Fit Kaplan-Meier curves
+fit_202S <- survfit(surv_202S ~ AGR2_202S_group,data = merged_data_202S)
+
 AGR2_202S_plot <- ggsurvplot(
-  fit,
-  data = km_data,
-  pval = TRUE,
+  fit_202S,
+  data = merged_data_202S,
+  pval = TRUE,                 # log-rank test
   risk.table = TRUE,
   palette = c("blue", "red"),  # Low = blue, High = red
+  title = "Progression-Free Survival by AGR2-202S Expression",
   xlab = "Progression-Free Months",
-  ylab = "Progression-Free Survival Probability",
-  legend.title = "AGR2-202S_log",
-  legend.labs = c("Low", "High")
+  ylab = "Progression-Free Survival Probability"
 )
 
 AGR2_202S_plot
-
 
 figure_qc_1 <- ggarrange(
   AGR2_202L_plot$plot,
@@ -308,8 +304,8 @@ figure_qc_1 <- ggarrange(
 
 figure_qc_1
 ggexport(figure_qc_1,filename = "Kaplan_Meier_plots.tiff",
-         width = 3800, # 7 inch max width 2100
-         height = 1200, 
+         width = 4400, # 7 inch max width 2100
+         height = 1600, 
          res = 300)
 
 figure_qc_2 <- arrange_ggsurvplots(
@@ -319,8 +315,8 @@ figure_qc_2 <- arrange_ggsurvplots(
   print = TRUE
 )
 ggexport(figure_qc_2,filename = "Kaplan_Meier_plots_2.tiff",
-         width = 4000, # 7 inch max width 2100
-         height = 1600, 
+         width = 5000, # 7 inch max width 2100
+         height = 1700, 
          res = 300)
 
 # =====================================================================================================================================================================================================================================================================================================================================================
