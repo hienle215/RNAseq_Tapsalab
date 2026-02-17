@@ -487,7 +487,7 @@ a <- ggforest(cox_model, data = merged_data,
          refLabel = "Reference")
 
 # Export forest plot as TIFF
-ggexport(forest_plot, filename = "Cox_analysis_AGR2_202S_PCcohort.tiff", width = 3200, height = 2500, res = 300)
+ggexport(forest_plot, filename = "Cox_analysis_AGR2_202L_PCcohort.tiff", width = 3200, height = 2500, res = 300)
 
 ###---------------------------------------------------------------Multivariate Cox regression for AGR2-202S---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 library(dplyr)
@@ -591,5 +591,5 @@ forest_plot <- ggforest(cox_model, data = merged_data,
 forest_plot
 
 # Optional: export plot
-# ggexport(forest_plot, filename = "Cox_analysis_AGR2_202S_PCcohort.tiff", width = 3200, height = 2500, res = 300)
+ggexport(forest_plot, filename = "Cox_analysis_AGR2_202S_PCcohort.tiff", width = 3200, height = 2500, res = 300)
 
