@@ -111,8 +111,8 @@ a = ggplot(df, aes(x = `AGR2-202L_log`, y = `AGR2-202S_log`)) +
            hjust = 1.1, vjust = -0.5,
            size = 5) +
   labs(title = "AGR2-202L vs AGR2-202S",
-       x = "AGR2-202L (log2)",
-       y = "AGR2-202S (log2)") +
+       x = "AGR2-202L",
+       y = "AGR2-202S") +
   theme_bw()
 
 # Scatter plot with regression line and correlation annotation between AGR2-202L and AGR2-203
@@ -125,8 +125,8 @@ b = ggplot(df, aes(x = `AGR2-202L_log`, y = `AGR2-203_log`)) +
            hjust = 1.1, vjust = -0.5,
            size = 5) +
   labs(title = "AGR2-202L vs AGR2-203",
-       x = "AGR2-202L (log2)",
-       y = "AGR2-203 (log2)") +
+       x = "AGR2-202L",
+       y = "AGR2-203") +
   theme_bw()
 
 # Scatter plot with regression line and correlation annotation between AGR2-202S and AGR2-203
@@ -139,8 +139,8 @@ c = ggplot(df, aes(x = `AGR2-202S_log`, y = `AGR2-203_log`)) +
            hjust = 1.1, vjust = -0.5,
            size = 5) +
   labs(title = "AGR2-202S vs AGR2-203",
-       x = "AGR2-202S (log2)",
-       y = "AGR2-203 (log2)") +
+       x = "AGR2-202S",
+       y = "AGR2-203") +
   theme_bw()
 
 #10. Arrange the images
@@ -239,7 +239,7 @@ AGR2_203 = ggsurvplot(fit_203,
            risk.table = TRUE,      # show risk table
            surv.median.line = "hv",
            palette = c("blue", "red"), # Low=blue, High=red
-           xlab = "Progression-Free Months",
+           title = "Progression-Free Survival by AGR2-203 Expression", xlab = "Progression-Free Months",
            ylab = "Progression-Free Survival Probability")
 
 )
@@ -304,7 +304,7 @@ figure_qc_1 <- ggarrange(
 
 figure_qc_1
 ggexport(figure_qc_1,filename = "Kaplan_Meier_plots.tiff",
-         width = 4400, # 7 inch max width 2100
+         width = 4800, # 7 inch max width 2100
          height = 1600, 
          res = 300)
 
@@ -315,7 +315,7 @@ figure_qc_2 <- arrange_ggsurvplots(
   print = TRUE
 )
 ggexport(figure_qc_2,filename = "Kaplan_Meier_plots_2.tiff",
-         width = 5000, # 7 inch max width 2100
+         width = 5200, # 7 inch max width 2100
          height = 1700, 
          res = 300)
 
