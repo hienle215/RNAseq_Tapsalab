@@ -233,16 +233,15 @@ surv_obj_203 <- Surv(time = merged_data_203$progression_free_months,
 fit_203 <- survfit(surv_obj_203 ~ AGR2_203_group, data = merged_data_203)
 
 # Plot
-AGR2_203 = ggsurvplot(fit_203,
-           data = merged_data_203,
-           pval = TRUE,            # show p-value
-           risk.table = TRUE,      # show risk table
-           surv.median.line = "hv",
-           palette = c("blue", "red"), # Low=blue, High=red
-           title = "Progression-Free Survival by AGR2-203 Expression", xlab = "Progression-Free Months",
-           ylab = "Progression-Free Survival Probability")
-
-)
+AGR2_203 <- ggsurvplot(
+  fit_203,
+  data = merged_data_203,
+  pval = TRUE,            # show p-value
+  risk.table = TRUE,      # show risk table
+  surv.median.line = "hv",
+  palette = c("blue", "red"), # Low=blue, High=red
+  title = "Progression-Free Survival by AGR2-203",
+  xlab = "PFM", ylab = "PFS")
 
 ###---------------------------data for AGR2-202L-----------------------------------------------------------------------------
 merged_data_202L <- merged_data %>%
@@ -263,10 +262,8 @@ AGR2_202L_plot <- ggsurvplot(
   pval = TRUE,                 # log-rank test
   risk.table = TRUE,
   palette = c("blue", "red"),  # Low = blue, High = red
-  title = "Progression-Free Survival by AGR2-202L Expression",
-  xlab = "Progression-Free Months",
-  ylab = "Progression-Free Survival Probability"
-)
+  title = "Progression-Free Survival by AGR2-202L",
+  xlab = "PFM",  ylab = "PFS")
 
 AGR2_202L_plot
 
@@ -285,10 +282,8 @@ AGR2_202S_plot <- ggsurvplot(
   pval = TRUE,                 # log-rank test
   risk.table = TRUE,
   palette = c("blue", "red"),  # Low = blue, High = red
-  title = "Progression-Free Survival by AGR2-202S Expression",
-  xlab = "Progression-Free Months",
-  ylab = "Progression-Free Survival Probability"
-)
+  title = "Progression-Free Survival by AGR2-202S",
+  xlab = "PFM",  ylab = "PFS")
 
 AGR2_202S_plot
 
@@ -323,14 +318,16 @@ ggexport(figure_qc_2,filename = "Kaplan_Meier_plots_2.tiff",
 # •	Multivariate Cox regression analysis
 # =====================================================================================================================================================================================================================================================================================================================================================
 ###---------------------------------------------------------------Multivariate Cox regression for AGR2-203---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-# Convert Gleason_score to numeric (remove NAs if needed)
+# ============================
+# Load libraries
+# ============================
 library(dplyr)
 library(survival)
 library(survminer)
 
-# ----------------------------
-# 1. Create high/low group for AGR2-203 based on median raw expression
-# ----------------------------
+# ============================
+# 1. AGR2-203 High / Low (median split)
+# ============================
 merged_data <- merged_data %>%
   mutate(
     AGR2_203_log_group = ifelse(
@@ -339,57 +336,70 @@ merged_data <- merged_data %>%
     )
   )
 
-# ----------------------------
-# 2. Clean PSA and create PSA groups
-# ----------------------------
+# ============================
+# 2. PSA groups (CORRECT — no na_if, no as.numeric)
+# ============================
 merged_data <- merged_data %>%
   mutate(
-    PSA_at_progression = as.numeric(na_if(PSA_at_progression, "NA")),  # convert "NA" strings to actual NA
-    PSA_group = cut(PSA_at_progression,
-                    breaks = c(-Inf, 10, 19.9, Inf),
-                    labels = c("≤10", "10-19.9", "≥20"))
+    PSA_group = cut(
+      PSA_at_progression,
+      breaks = c(-Inf, 10, 19.9, Inf),
+      labels = c("≤10", "10–19.9", "≥20")
+    )
   )
 
-# ----------------------------
-# 3. Convert Gleason score to numeric and create groups
-# ----------------------------
+# ============================
+# 3. Gleason groups (CORRECT)
+# ============================
 merged_data <- merged_data %>%
   mutate(
-    Gleason_score = as.numeric(as.character(Gleason_score)),
-    Gleason_group = cut(Gleason_score,
-                        breaks = c(-Inf, 6, 7, Inf),
-                        labels = c("<7", "7", ">7"))
+    Gleason_group = cut(
+      Gleason_score,
+      breaks = c(-Inf, 6, 7, Inf),
+      labels = c("<7", "7", ">7")
+    )
   )
 
-# ----------------------------
-# 4. Ensure pT is a factor
-# ----------------------------
+# ============================
+# 4. pT as factor
+# ============================
 merged_data$pT <- as.factor(merged_data$pT)
 
-# ----------------------------
-# 5. Filter for KM analysis
-# ----------------------------
+# ============================
+# 5. Prepare KM dataset
+# ============================
 km_data <- merged_data %>%
   filter(
     !is.na(AGR2_203_log_group),
     !is.na(progression_free_months),
-    !is.na(Progression)
+    !is.na(`Progression (0=no, 1=yes)`)
   )
 
-# ----------------------------
-# 6. Kaplan-Meier survival object & fit
-# ----------------------------
-surv_obj <- Surv(time = km_data$progression_free_months, event = km_data$Progression)
-fit <- survfit(surv_obj ~ AGR2_203_log_group, data = km_data)
+# ============================
+# 6. Survival object
+# ============================
+surv_obj <- Surv(
+  time  = km_data$progression_free_months,
+  event = km_data$`Progression (0=no, 1=yes)`
+)
 
-# ----------------------------
-# 7. KM plot
-# ----------------------------
+# ============================
+# 7. Kaplan–Meier fit
+# ============================
+fit <- survfit(
+  surv_obj ~ AGR2_203_log_group,
+  data = km_data
+)
+
+# ============================
+# 8. Kaplan–Meier plot
+# ============================
 km_plot <- ggsurvplot(
   fit,
   data = km_data,
   pval = TRUE,
   risk.table = TRUE,
+  surv.median.line = "hv",
   palette = c("blue", "red"),
   xlab = "Progression-Free Months",
   ylab = "Progression-Free Survival Probability",
@@ -397,64 +407,81 @@ km_plot <- ggsurvplot(
   legend.labs = c("Low", "High")
 )
 
-# Print KM plot
-km_plot
+print(km_plot)
 
-# ----------------------------
-# 8. Multivariate Cox regression
-# ----------------------------
-cox_model <- coxph(surv_obj ~ AGR2_203_log_group + Age_at_diagnosis +
-                     PSA_group + Gleason_group + pT,
-                   data = merged_data)
+# ============================
+# 9. Multivariate Cox regression
+# ============================
+cox_model <- coxph(
+  Surv(progression_free_months, `Progression (0=no, 1=yes)`) ~
+    AGR2_203_log_group +
+    Age_at_diagnosis +
+    PSA_group +
+    Gleason_group +
+    pT,
+  data = merged_data
+)
 
-# ----------------------------
-# 9. View summary
-# ----------------------------
 summary(cox_model)
 
-# ----------------------------
+# ============================
 # 10. Forest plot
-# ----------------------------
-forest_plot <- ggforest(cox_model, data = merged_data,
-                        main = "Multivariate Cox regression for AGR2-203",
-                        cpositions = c(0.02, 0.22, 0.4),
-                        fontsize = 1,
-                        refLabel = "Reference")
+# ============================
+forest_plot <- ggforest(
+  cox_model,
+  data = merged_data,
+  main = "Multivariate Cox regression for AGR2-203",
+  cpositions = c(0.02, 0.22, 0.4),
+  fontsize = 1,
+  refLabel = "Reference"
+)
 
-# Print forest plot
-forest_plot
+print(forest_plot)
 
-ggexport(forest_plot, filename = "Cox_analysis_AGR2_203_PCcohort.tiff", width = 3200, height = 2500, res = 300)
+# ============================
+# 11. Export forest plot
+# ============================
+ggexport(
+  forest_plot,
+  filename = "Cox_analysis_AGR2_203_PCcohort.tiff",
+  width = 3200,
+  height = 2500,
+  res = 300
+)
+
 
 ###---------------------------------------------------------------Multivariate Cox regression for AGR2-202L---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-library(survival)
-library(survminer)
-library(dplyr)
-library(ggpubr)  # for ggexport
-
-# ----------------------------
 # 1. Prepare variables
 # ----------------------------
 
-# Divide AGR2-202L expression into High vs Low (median split)
+# AGR2-202L High vs Low (median split, RAW expression)
 merged_data <- merged_data %>%
-  mutate(AGR2_202L_log_group = ifelse(AGR2_202L_log >= median(AGR2_202L_log, na.rm = TRUE),
-                                      "High", "Low"))
+  mutate(
+    AGR2_202L_group = ifelse(
+      `AGR2-202L` > median(`AGR2-202L`, na.rm = TRUE),
+      "High", "Low"
+    )
+  )
 
-# PSA categories
+# PSA categories (diagnostic PSA)
 merged_data <- merged_data %>%
-  mutate(PSA_group = cut(diagnostic_PSA,
-                         breaks = c(-Inf, 10, 19.9, Inf),
-                         labels = c("≤10", "10-19.9", "≥20")))
+  mutate(
+    PSA_group = cut(
+      diagnostic_PSA,
+      breaks = c(-Inf, 10, 19.9, Inf),
+      labels = c("≤10", "10–19.9", "≥20")
+    )
+  )
 
-# Convert Gleason_score to numeric (remove NAs if needed)
-merged_data$Gleason_score <- as.numeric(as.character(merged_data$Gleason_score))
-
-# Gleason score categories
+# Gleason score groups (already numeric in your data)
 merged_data <- merged_data %>%
-  mutate(Gleason_group = cut(Gleason_score,
-                             breaks = c(-Inf, 6, 7, Inf),
-                             labels = c("<7", "7", ">7")))
+  mutate(
+    Gleason_group = cut(
+      Gleason_score,
+      breaks = c(-Inf, 6, 7, Inf),
+      labels = c("<7", "7", ">7")
+    )
+  )
 
 # Ensure pT is factor
 merged_data$pT <- as.factor(merged_data$pT)
@@ -462,15 +489,22 @@ merged_data$pT <- as.factor(merged_data$pT)
 # ----------------------------
 # 2. Create survival object
 # ----------------------------
-surv_obj <- Surv(time = merged_data$progression_free_months,
-                 event = merged_data$Progression)
+surv_obj <- Surv(
+  time  = merged_data$progression_free_months,
+  event = merged_data$`Progression (0=no, 1=yes)`
+)
 
 # ----------------------------
 # 3. Multivariate Cox regression
 # ----------------------------
-cox_model <- coxph(surv_obj ~ AGR2_202L_log_group + Age_at_diagnosis +
-                   PSA_group + Gleason_group + pT,
-                   data = merged_data)
+cox_model <- coxph(
+  surv_obj ~ AGR2_202L_group +
+    Age_at_diagnosis +
+    PSA_group +
+    Gleason_group +
+    pT,
+  data = merged_data
+)
 
 # ----------------------------
 # 4. View summary
@@ -480,116 +514,110 @@ summary(cox_model)
 # ----------------------------
 # 5. Forest plot visualization
 # ----------------------------
-a <- ggforest(cox_model, data = merged_data,
-         main = "Multivariate Cox regression for AGR2-202L",
-         cpositions = c(0.02, 0.22, 0.4),
-         fontsize = 1,
-         refLabel = "Reference")
+forest_plot <- ggforest(
+  cox_model,
+  data = merged_data,
+  main = "Multivariate Cox regression for AGR2-202L",
+  cpositions = c(0.02, 0.22, 0.4),
+  fontsize = 1,
+  refLabel = "Reference"
+)
+
+print(forest_plot)
+
 
 # Export forest plot as TIFF
 ggexport(forest_plot, filename = "Cox_analysis_AGR2_202L_PCcohort.tiff", width = 3200, height = 2500, res = 300)
 
 ###---------------------------------------------------------------Multivariate Cox regression for AGR2-202S---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-library(dplyr)
 library(survival)
 library(survminer)
+library(dplyr)
+library(ggpubr)  # for ggexport
 
 # ----------------------------
-# 1. Create high/low group for AGR2-202S based on median raw expression
+# 1. Prepare variables
 # ----------------------------
+
+# AGR2-202S High vs Low (median split, raw expression)
 merged_data <- merged_data %>%
   mutate(
-    AGR2_202S_log_group = ifelse(
+    AGR2_202S_group = ifelse(
       `AGR2-202S` > median(`AGR2-202S`, na.rm = TRUE),
       "High", "Low"
     )
   )
 
-# ----------------------------
-# 2. Clean PSA and create PSA groups
-# ----------------------------
+# PSA categories (diagnostic PSA)
 merged_data <- merged_data %>%
   mutate(
-    PSA_at_progression = as.numeric(na_if(PSA_at_progression, "NA")),  # convert "NA" strings to actual NA
-    PSA_group = cut(PSA_at_progression,
-                    breaks = c(-Inf, 10, 19.9, Inf),
-                    labels = c("≤10", "10-19.9", "≥20"))
+    PSA_group = cut(
+      diagnostic_PSA,
+      breaks = c(-Inf, 10, 19.9, Inf),
+      labels = c("≤10", "10–19.9", "≥20")
+    )
   )
 
-# ----------------------------
-# 3. Convert Gleason score to numeric and create groups
-# ----------------------------
+# Gleason score groups
 merged_data <- merged_data %>%
   mutate(
-    Gleason_score = as.numeric(as.character(Gleason_score)),
-    Gleason_group = cut(Gleason_score,
-                        breaks = c(-Inf, 6, 7, Inf),
-                        labels = c("<7", "7", ">7"))
+    Gleason_group = cut(
+      Gleason_score,
+      breaks = c(-Inf, 6, 7, Inf),
+      labels = c("<7", "7", ">7")
+    )
   )
 
-# ----------------------------
-# 4. Ensure pT is a factor
-# ----------------------------
+# Ensure pT is a factor
 merged_data$pT <- as.factor(merged_data$pT)
 
 # ----------------------------
-# 5. Filter for KM analysis
+# 2. Create survival object
 # ----------------------------
-km_data <- merged_data %>%
-  filter(
-    !is.na(AGR2_202S_log_group),
-    !is.na(progression_free_months),
-    !is.na(Progression)
-  )
-
-# ----------------------------
-# 6. Kaplan-Meier survival object & fit
-# ----------------------------
-surv_obj <- Surv(time = km_data$progression_free_months, event = km_data$Progression)
-fit <- survfit(surv_obj ~ AGR2_202S_log_group, data = km_data)
-
-# ----------------------------
-# 7. KM plot
-# ----------------------------
-km_plot <- ggsurvplot(
-  fit,
-  data = km_data,
-  pval = TRUE,
-  risk.table = TRUE,
-  palette = c("blue", "red"),
-  xlab = "Progression-Free Months",
-  ylab = "Progression-Free Survival Probability",
-  legend.title = "AGR2-202S",
-  legend.labs = c("Low", "High")
+surv_obj <- Surv(
+  time  = merged_data$progression_free_months,
+  event = merged_data$`Progression (0=no, 1=yes)`
 )
 
-# Print KM plot
-km_plot
+# ----------------------------
+# 3. Multivariate Cox regression
+# ----------------------------
+cox_model <- coxph(
+  surv_obj ~ AGR2_202S_group +
+    Age_at_diagnosis +
+    PSA_group +
+    Gleason_group +
+    pT,
+  data = merged_data
+)
 
 # ----------------------------
-# 8. Multivariate Cox regression
-# ----------------------------
-cox_model <- coxph(surv_obj ~ AGR2_202S_log_group + Age_at_diagnosis +
-                     PSA_group + Gleason_group + pT,
-                   data = merged_data)
-
-# ----------------------------
-# 9. View summary
+# 4. View summary
 # ----------------------------
 summary(cox_model)
 
 # ----------------------------
-# 10. Forest plot
+# 5. Forest plot visualization
 # ----------------------------
-forest_plot <- ggforest(cox_model, data = merged_data,
-                        main = "Multivariate Cox regression for AGR2-202S",
-                        cpositions = c(0.02, 0.22, 0.4),
-                        fontsize = 1,
-                        refLabel = "Reference")
+forest_plot <- ggforest(
+  cox_model,
+  data = merged_data,
+  main = "Multivariate Cox regression for AGR2-202S",
+  cpositions = c(0.02, 0.22, 0.4),
+  fontsize = 1,
+  refLabel = "Reference"
+)
 
-# Print forest plot
-forest_plot
+print(forest_plot)
 
-# Optional: export plot
-ggexport(forest_plot, filename = "Cox_analysis_AGR2_202S_PCcohort.tiff", width = 3200, height = 2500, res = 300)
+# ----------------------------
+# 6. Export forest plot (optional)
+# ----------------------------
+ggexport(
+  forest_plot,
+  filename = "Cox_analysis_AGR2_202S_PCcohort.tiff",
+  width = 3200,
+  height = 2500,
+  res = 300
+)
 
