@@ -1,0 +1,22 @@
+#lenh cai
+conda create -n rmats_env -c bioconda rmats
+
+#lenh load
+conda activate rmats_env
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+module load bio/Salmon/1.10.3-GCC-13.3.0
+
+cd salmon
+cat /scratch/svc_td_mbpcg/projects/HanaL/input/reference_hg38/salmon_library/gencode_v48_orginal.fa /scratch/svc_td_mbpcg/projects/HanaL/input/reference_hg38/salmon_library/AGR2_202_L_S.fa > gencode_v48_plus_AGR2custom.fa
+
+salmon index \
+-t gencode_v48_plus_AGR2custom.fa \
+-i salmon_index \
+--gencode \
+-k 31
+
+salmon index \
+-t gencode_v48_plus_AGR2custom.fa \
+-i salmon_index \
+-k 31
