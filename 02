@@ -6,6 +6,7 @@ module load bio/kallisto/0.51.1-gompi-2023b
 zgrep -i AGR2 gencode.v48.transcripts.fa.gz
 
  zgrep -i AGR2 gencode.v48.transcripts.fa.gz
+zgrep -i AGR2 /scratch/svc_td_mbpcg/projects/HanaL/input/reference_hg38/gencode.v48.transcripts.fa.gz
 
  zcat gencode.v48.transcripts.fa.gz | \
 awk '
