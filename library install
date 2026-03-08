@@ -16,7 +16,10 @@ salmon index \
 --gencode \
 -k 31
 
-salmon index \
--t gencode_v48_plus_AGR2custom.fa \
+salmon quant \
 -i salmon_index \
--k 31
+-l A \
+-1 sample_R1.fastq.gz \
+-2 sample_R2.fastq.gz \
+-p 8 \
+-o sample_quant
