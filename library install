@@ -4,6 +4,15 @@ conda create -n rmats_env -c bioconda rmats
 #lenh load
 conda activate rmats_env
 
+# Activate your rMATS environment
+conda activate rmats_env
+
+# Install HISAT2 from bioconda
+conda install -c bioconda hisat2 -y
+
+# Check installation
+hisat2 --version
+
 -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 module load bio/Salmon/1.10.3-GCC-13.3.0
 
