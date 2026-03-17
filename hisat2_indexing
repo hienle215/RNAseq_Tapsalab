@@ -1,0 +1,82 @@
+#!/bin/bash
+#SBATCH --job-name=hisat2-index
+#SBATCH --output=hisat2_index_%j.out
+#SBATCH --error=hisat2_index_%j.err
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=02:00:00
+#SBATCH --partition=small
+#SBATCH --constraint=skylake
+#SBATCH --mail-type=END
+#SBATCH --mail-user=hien.le@tuni.fi
+
+#-----------------------------------
+# Load environment
+#-----------------------------------
+module purge
+conda init
+conda activate rmats_env
+
+#-----------------------------------
+# Threads
+#-----------------------------------
+THREADS=${SLURM_CPUS_PER_TASK:-8}
+
+#-----------------------------------
+# Paths
+#-----------------------------------
+ANNOT_DIR="/scratch/svc_td_mbpcg/projects/HanaL/cell_line_del/rMATS"
+cd "$ANNOT_DIR" || { echo "ERROR: $ANNOT_DIR not found!"; exit 1; }
+
+#-----------------------------------
+# Input files (GENOME, not transcripts!)
+#-----------------------------------
+GENOME_FA="GRCh38.primary_assembly.genome.fa"
+GTF="gencode.v48.annotation.gtf"
+
+# Check files
+if [ ! -f "$GENOME_FA" ]; then
+    echo "ERROR: $GENOME_FA not found!"
+    exit 1
+fi
+
+if [ ! -f "$GTF" ]; then
+    echo "ERROR: $GTF not found!"
+    exit 1
+fi
+
+#-----------------------------------
+# Step 1: Extract splice info
+#-----------------------------------
+echo "Extracting splice sites and exons..."
+
+hisat2_extract_splice_sites.py gencode.v48.annotation.gtf > splicesites.txt
+hisat2_extract_exons.py gencode.v48.annotation.gtf > exons.txt
+
+#-----------------------------------
+# Step 2: Build HISAT2 index
+#-----------------------------------
+INDEX_PREFIX="genome_index"
+
+echo "Building HISAT2 index with $THREADS threads..."
+
+hisat2-build -p 8 \
+  --ss splicesites.txt \
+  --exon exons.txt \
+  GRCh38.primary_assembly.genome.fa \
+  genome_index
+
+#-----------------------------------
+# Step 3: Verify index
+#-----------------------------------
+if ls ${INDEX_PREFIX}*.ht2 1> /dev/null 2>&1; then
+    echo "========================================"
+    echo "HISAT2 index successfully created:"
+    ls -lh ${INDEX_PREFIX}*.ht2
+    echo "========================================"
+else
+    echo "ERROR: HISAT2 index creation failed!"
+    exit 1
+fi
+
+echo "Job completed at $(date)"
