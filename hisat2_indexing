@@ -1,11 +1,33 @@
+###--------------------------------prepare for hisat2 annotation in LINUX---------------------------------------------------------------------
+custom_transcripts.fa ---> transcriptome FASTA
+in rMATS, you typically need: Genome FASTA and Annotation GTF
+
+Step1: Prepare genomce and annotation by downloading from GENCODE v48
+# Genome (GRCh38)
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_48/GRCh38.primary_assembly.genome.fa.gz
+gunzip GRCh38.primary_assembly.genome.fa.gz
+
+# Annotation
+wget ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_48/gencode.v48.annotation.gtf.gz
+gunzip gencode.v48.annotation.gtf.gz
+
+# In there, GRCh38.primary_assembly.genome.fa → genome FASTA and gencode.v48.annotation.gtf → GTF annotation for rMATS
+nano AGR2_custom.gtf
+
+# Paste both isoforms
+# paste the gtf of AGR2-202L and AGR-202S in gtf file
+cat AGR2_custom.gtf >> gencode.v48.annotation.gtf
+
+###-------------------------------------------making hisat2 index-----------------------------------------------------------------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 #!/bin/bash
 #SBATCH --job-name=hisat2-index
 #SBATCH --output=hisat2_index_%j.out
 #SBATCH --error=hisat2_index_%j.err
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=32G
+#SBATCH --mem=128G
 #SBATCH --time=02:00:00
-#SBATCH --partition=small
+#SBATCH --partition=large
 #SBATCH --constraint=skylake
 #SBATCH --mail-type=END
 #SBATCH --mail-user=hien.le@tuni.fi
@@ -13,8 +35,9 @@
 #-----------------------------------
 # Load environment
 #-----------------------------------
-module purge
 conda init
+module purge
+source ~/.bashrc
 conda activate rmats_env
 
 #-----------------------------------
@@ -60,11 +83,7 @@ INDEX_PREFIX="genome_index"
 
 echo "Building HISAT2 index with $THREADS threads..."
 
-hisat2-build -p 8 \
-  --ss splicesites.txt \
-  --exon exons.txt \
-  GRCh38.primary_assembly.genome.fa \
-  genome_index
+hisat2-build -p 8 GRCh38.primary_assembly.genome.fa genome_index
 
 #-----------------------------------
 # Step 3: Verify index
