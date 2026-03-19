@@ -99,3 +99,40 @@ else
 fi
 
 echo "Job completed at $(date)"
+
+###----------------------------------------------------------sam-to-bam---------------------------------------------------------------------------
+###------------------------------------------------------------------------------------------------------------------------------------------------
+#!/bin/bash -l
+#SBATCH -J sam2bam
+#SBATCH --partition=small
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=05:00:00
+#SBATCH --array=1-9
+
+set -euo pipefail
+
+SAM_DIR="/scratch/svc_td_mbpcg/projects/HanaL/cell_line_del/rMATS/sam"
+OUT_DIR="${SAM_DIR}/bam"
+
+mkdir -p "$OUT_DIR"
+
+module purge
+source ~/.bashrc
+conda activate rmats_env
+module load bio/SAMtools/1.19.2-GCC-13.2.0
+
+THREADS=${SLURM_CPUS_PER_TASK:-8}
+
+mapfile -t SAM_FILES < <(find "$SAM_DIR" -name "*.sam" | sort)
+
+SAM=${SAM_FILES[$((SLURM_ARRAY_TASK_ID - 1))]}
+SAMPLE=$(basename "$SAM" .sam)
+
+echo "Processing $SAMPLE"
+
+samtools sort -@ "$THREADS" -o "$OUT_DIR/${SAMPLE}.sorted.bam" "$SAM"
+samtools index "$OUT_DIR/${SAMPLE}.sorted.bam"
+
+echo "Done: $SAMPLE"
