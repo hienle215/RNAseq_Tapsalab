@@ -136,3 +136,69 @@ samtools sort -@ "$THREADS" -o "$OUT_DIR/${SAMPLE}.sorted.bam" "$SAM"
 samtools index "$OUT_DIR/${SAMPLE}.sorted.bam"
 
 echo "Done: $SAMPLE"
+
+###---------------------------------------------------stringtie---------------------------------------------------------------------------------------
+###---------------------------------------------------------------------------------------------------------------------------------------------------
+#!/bin/bash -l
+#SBATCH -J stringtie_quant
+#SBATCH --partition=small
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=10:00:00
+#SBATCH --array=1-9
+#SBATCH --constraint=skylake
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=hien.le@tuni.fi
+
+set -euo pipefail
+
+#------------------------- PATHS -------------------------#
+BAM_DIR="/scratch/svc_td_mbpcg/projects/HanaL/cell_line_del/rMATS/sam/bam"
+GTF="/scratch/svc_td_mbpcg/projects/HanaL/cell_line_del/rMATS/gencode.v48.annotation.gtf"
+OUT_DIR="/scratch/svc_td_mbpcg/projects/HanaL/cell_line_del/rMATS/stringtie"
+
+mkdir -p "$OUT_DIR"
+
+#------------------------- ENV --------------------------#
+# Ensure conda commands work in SLURM
+export PATH="$HOME/miniconda3/bin:$PATH"
+source "$HOME/miniconda3/etc/profile.d/conda.sh"
+conda activate rmats_env
+
+# check that stringtie is visible
+if ! command -v stringtie &> /dev/null; then
+    echo "ERROR: StringTie not found in this environment!"
+    exit 1
+fi
+
+THREADS=${SLURM_CPUS_PER_TASK:-8}
+
+#------------------------- BAM LIST ---------------------#
+mapfile -t BAM_FILES < <(find "$BAM_DIR" -name "*.sorted.bam" | sort)
+
+IDX=$((SLURM_ARRAY_TASK_ID - 1))
+BAM=${BAM_FILES[$IDX]}
+
+# Check BAM exists
+if [[ ! -f "$BAM" ]]; then
+    echo "ERROR: BAM file not found: $BAM"
+    exit 1
+fi
+
+SAMPLE=$(basename "$BAM" .sorted.bam)
+
+echo "======================================="
+echo "Sample: $SAMPLE"
+echo "BAM: $BAM"
+echo "======================================="
+
+#------------------------- RUN STRINGTIE ----------------#
+stringtie "$BAM" \
+  -G "$GTF" \
+  -o "$OUT_DIR/${SAMPLE}.gtf" \
+  -A "$OUT_DIR/${SAMPLE}_gene_abundance.tsv" \
+  -e -B \
+  -p "$THREADS"
+
+echo "Finished $SAMPLE"
