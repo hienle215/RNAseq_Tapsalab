@@ -202,3 +202,76 @@ stringtie "$BAM" \
   -p "$THREADS"
 
 echo "Finished $SAMPLE"
+
+###-----------------------------------------------------------count junction directly from sam/bam file----------------------------------------------------------------------------------------------------------------------------------------
+###--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Looking for the 31,452bp gap unique to the 202S variant
+samtools view WT_24_2.sorted.bam "chr7:16801800-16833300" | grep -E "3145[123]N" | wc -l
+
+# Looking for the 3,131bp gap unique to the 203 variant
+samtools view WT_24_2.sorted.bam "chr7:16801800-16805000" | grep -E "313[012]N" | wc -l
+
+# Looking for the 31,452bp gap unique to the 202L variant
+samtools view WT_24_2.sorted.bam "chr7:16811700-16833300" | grep -E "2150[01]N" | wc -l
+
+### get total mapped reads
+# Run this for each BAM file
+samtools idxstats del_4_1.sorted.bam | awk '{s+=$3} END {print s}'
+samtools idxstats del_4_2.sorted.bam | awk '{s+=$3} END {print s}'
+samtools idxstats del_4_3.sorted.bam | awk '{s+=$3} END {print s}'
+samtools idxstats del_56_1.sorted.bam | awk '{s+=$3} END {print s}'
+samtools idxstats del_56_2.sorted.bam | awk '{s+=$3} END {print s}'
+samtools idxstats del_56_3.sorted.bam | awk '{s+=$3} END {print s}'
+samtools idxstats WT_24_1.sorted.bam | awk '{s+=$3} END {print s}'
+samtools idxstats WT_24_2.sorted.bam | awk '{s+=$3} END {print s}'
+samtools idxstats WT_24_3.sorted.bam | awk '{s+=$3} END {print s}'
+
+
+### --------------------------------------------visualization of isoform AGR2 in R-------------------------------------------------------------------------------------------------------------------------------------------------------------
+###---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+# Install necessary libraries if you don't have them
+# install.packages(c("ggplot2", "ggpubr", "tidyr", "dplyr"))
+
+library(ggplot2)
+library(ggpubr)
+library(tidyr)
+library(dplyr)
+
+# 1. Create the data frame based on your CPM values
+data <- data.frame(
+  Sample = c("del_4_1", "del_4_2", "del_4_3", "del_56_1", "del_56_2", "del_56_3", "WT_24_1", "WT_24_2", "WT_24_3"),
+  Group = c("del_4", "del_4", "del_4", "del_56", "del_56", "del_56", "WT_24", "WT_24", "WT_24"),
+  AGR2_203 = c(0.3831, 0.2589, 0.2601, 0.3851, 0.5770, 0.3497, 1.3611, 1.2759, 1.5649),
+  AGR2_202L = c(1.8902, 1.1963, 1.4656, 1.2238, 1.2274, 1.3528, 0.8062, 0.6649, 0.6100),
+  AGR2_202S = c(0.7578, 0.3749, 0.3555, 0.3851, 0.3663, 0.3681, 0.2600, 0.2785, 0.3271)
+)
+
+# 2. Reshape data for plotting
+df_long <- data %>%
+  pivot_longer(cols = starts_with("AGR2"), names_to = "Isoform", values_to = "CPM")
+
+# 3. Create the function to plot each isoform independently
+plot_isoform <- function(isoform_name) {
+  subset_df <- df_long %>% filter(Isoform == isoform_name)
+  
+  ggbarplot(subset_df, x = "Group", y = "CPM", 
+            fill = "Group", palette = "jco",
+            add = "mean_se", # Adds Mean and Standard Error bars
+            label = FALSE, 
+            title = paste("Expression of", isoform_name),
+            ylab = "Normalized Counts (CPM)",
+            xlab = "Group") +
+    stat_compare_means(method = "anova", label.y = max(subset_df$CPM) * 1.1) + # Global P-value
+    stat_compare_means(label = "p.signif", method = "t.test", 
+                       ref.group = "WT_24") # Comparison against WT
+}
+
+# 4. Generate the 3 independent plots
+p1 <- plot_isoform("AGR2_203")
+p2 <- plot_isoform("AGR2_202L")
+p3 <- plot_isoform("AGR2_202S")
+
+# Show plots
+print(p1)
+print(p2)
+print(p3)
