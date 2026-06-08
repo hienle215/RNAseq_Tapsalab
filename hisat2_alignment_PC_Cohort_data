@@ -1,0 +1,208 @@
+#!/bin/bash -l
+#SBATCH -J hisat2_align
+#SBATCH --partition=small
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=12:00:00
+#SBATCH --array=1-40
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=hien.le@tuni.fi
+
+set -euo pipefail
+
+#------------------------- Paths -------------------------#
+FASTQ_DIR="/scratch/svc_td_mbpcg/projects/HanaL/PC_cohort_3"
+OUT_DIR="/scratch/svc_td_mbpcg/projects/HanaL/PC_cohort_3/hisat2_alignment/bam"
+INDEX="/scratch/svc_td_mbpcg/projects/HanaL/cell_line_del/rMATS/genome_index/genome_index"
+
+mkdir -p "${OUT_DIR}"
+
+#------------------------- Environment -------------------#
+module purge
+source ~/.bashrc
+conda activate rmats_env
+module load bio/SAMtools/1.19.2-GCC-13.2.0
+THREADS=${SLURM_CPUS_PER_TASK:-8}
+
+#------------------------- Sample List -------------------#
+mapfile -t SAMPLE_DIRS < <(
+    find "${FASTQ_DIR}" \
+        -mindepth 1 \
+        -maxdepth 1 \
+        -type d \
+        ! -name "hisat2_alignment" \
+        ! -name "output_filteredAGR2" \
+        ! -name "logs" \
+        | sort
+)
+
+NUM_SAMPLES=${#SAMPLE_DIRS[@]}
+echo "Detected ${NUM_SAMPLES} sample folders"
+
+#------------------------- SLURM checks ------------------#
+if [[ -z "${SLURM_ARRAY_TASK_ID:-}" ]]; then
+    echo "ERROR: SLURM_ARRAY_TASK_ID is not set"
+    exit 1
+fi
+
+if [[ ${SLURM_ARRAY_TASK_ID} -lt 1 || ${SLURM_ARRAY_TASK_ID} -gt ${NUM_SAMPLES} ]]; then
+    echo "ERROR: Array task ID ${SLURM_ARRAY_TASK_ID} out of range (1-${NUM_SAMPLES})"
+    exit 1
+fi
+
+IDX=$((SLURM_ARRAY_TASK_ID - 1))
+
+SAMPLE_DIR="${SAMPLE_DIRS[$IDX]}"
+SAMPLE_NAME=$(basename "${SAMPLE_DIR}")
+
+#------------------------- Find FASTQs -------------------#
+R1=$(find "${SAMPLE_DIR}" -maxdepth 1 -type f -name "*_1.fq.gz" | head -n 1)
+R2=$(find "${SAMPLE_DIR}" -maxdepth 1 -type f -name "*_2.fq.gz" | head -n 1)
+
+#------------------------- Verify files ------------------#
+[[ -n "${R1}" ]] || { echo "ERROR: No R1 FASTQ found in ${SAMPLE_DIR}"; exit 1; }
+[[ -n "${R2}" ]] || { echo "ERROR: No R2 FASTQ found in ${SAMPLE_DIR}"; exit 1; }
+[[ -f "${R1}" ]] || { echo "ERROR: R1 missing: ${R1}"; exit 1; }
+[[ -f "${R2}" ]] || { echo "ERROR: R2 missing: ${R2}"; exit 1; }
+
+[[ -f "${INDEX}.1.ht2" ]] || { echo "ERROR: HISAT2 index missing"; exit 1; }
+
+PREFIX="${OUT_DIR}/${SAMPLE_NAME}"
+
+echo "=========================================="
+echo "Array task ID : ${SLURM_ARRAY_TASK_ID}"
+echo "Sample name   : ${SAMPLE_NAME}"
+echo "Sample folder : ${SAMPLE_DIR}"
+echo "R1            : ${R1}"
+echo "R2            : ${R2}"
+echo "Output BAM    : ${PREFIX}.sorted.bam"
+echo "=========================================="
+
+#------------------------- Skip if done ------------------#
+if [[ -f "${PREFIX}.sorted.bam" ]]; then
+    echo "SKIPPING: ${SAMPLE_NAME} already aligned"
+    exit 0
+fi
+
+#------------------------- Run HISAT2 + BAM pipe --------#
+echo "Starting HISAT2 alignment..."
+
+#!/bin/bash -l
+#SBATCH -J hisat2_align
+#SBATCH --partition=small
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=32G
+#SBATCH --time=12:00:00
+#SBATCH --array=1-30
+#SBATCH --mail-type=END,FAIL
+#SBATCH --mail-user=hien.le@tuni.fi
+
+set -euo pipefail
+
+#------------------------- Paths -------------------------#
+FASTQ_DIR="/scratch/svc_td_mbpcg/projects/HanaL/PC_cohort_3"
+OUT_DIR="/scratch/svc_td_mbpcg/projects/HanaL/PC_cohort_3/hisat3_alignment/bam"
+INDEX="/scratch/svc_td_mbpcg/projects/HanaL/cell_line_del/rMATS/genome_index/genome_index"
+
+mkdir -p "${OUT_DIR}"
+
+#------------------------- Environment -------------------#
+module purge
+source ~/.bashrc
+conda activate rmats_env
+module load bio/SAMtools/1.19.2-GCC-13.2.0
+
+THREADS=${SLURM_CPUS_PER_TASK:-8}
+
+#------------------------- Sample List -------------------#
+mapfile -t SAMPLE_DIRS < <(
+    find "${FASTQ_DIR}" \
+        -mindepth 1 \
+        -maxdepth 1 \
+        -type d \
+        ! -name "hisat2_alignment" \
+        ! -name "output_filteredAGR2" \
+        ! -name "logs" \
+        | sort
+)
+
+NUM_SAMPLES=${#SAMPLE_DIRS[@]}
+echo "Detected ${NUM_SAMPLES} sample folders"
+
+# Optional safety if array is misconfigured
+if [[ -z "${SLURM_ARRAY_TASK_ID:-}" ]]; then
+    echo "ERROR: SLURM_ARRAY_TASK_ID not set"
+    exit 1
+fi
+
+if [[ ${SLURM_ARRAY_TASK_ID} -lt 1 || ${SLURM_ARRAY_TASK_ID} -gt ${NUM_SAMPLES} ]]; then
+    echo "ERROR: Array task ID ${SLURM_ARRAY_TASK_ID} out of range (1-${NUM_SAMPLES})"
+    exit 1
+fi
+
+IDX=$((SLURM_ARRAY_TASK_ID - 1))
+
+SAMPLE_DIR="${SAMPLE_DIRS[$IDX]}"
+SAMPLE_NAME=$(basename "${SAMPLE_DIR}")
+
+#------------------------- FASTQs ------------------------#
+R1=$(find "${SAMPLE_DIR}" -maxdepth 1 -type f -name "*_1.fq.gz" | head -n 1)
+R2=$(find "${SAMPLE_DIR}" -maxdepth 1 -type f -name "*_2.fq.gz" | head -n 1)
+
+[[ -n "${R1}" ]] || { echo "ERROR: No R1 FASTQ found in ${SAMPLE_DIR}"; exit 1; }
+[[ -n "${R2}" ]] || { echo "ERROR: No R2 FASTQ found in ${SAMPLE_DIR}"; exit 1; }
+
+PREFIX="${OUT_DIR}/${SAMPLE_NAME}"
+
+echo "=========================================="
+echo "Task ID       : ${SLURM_ARRAY_TASK_ID}"
+echo "Sample name   : ${SAMPLE_NAME}"
+echo "R1            : ${R1}"
+echo "R2            : ${R2}"
+echo "Output BAM    : ${PREFIX}.sorted.bam"
+echo "=========================================="
+
+#------------------------- Skip if done -----------------#
+if [[ -f "${PREFIX}.sorted.bam" ]]; then
+    echo "SKIPPING: ${SAMPLE_NAME} already exists"
+    exit 0
+fi
+
+#------------------------- Clean safety ------------------#
+# Remove any leftover temp files from previous crashes
+rm -f "${PREFIX}.sorted.bam.tmp."* 2>/dev/null || true
+
+# Create unique temp directory for THIS task
+TMPDIR_SORT=$(mktemp -d "${OUT_DIR}/tmp_sort_${SAMPLE_NAME}_XXXX")
+
+# Ensure cleanup on exit
+trap 'rm -rf "${TMPDIR_SORT}"' EXIT
+
+#------------------------- Run HISAT2 + SAMTOOLS --------#
+echo "Starting HISAT2 alignment..."
+
+hisat2 \
+    -x "${INDEX}" \
+    -1 "${R1}" \
+    -2 "${R2}" \
+    --dta \
+    -p "${THREADS}" \
+| samtools sort \
+    -@ "${THREADS}" \
+    -T "${TMPDIR_SORT}/${SAMPLE_NAME}" \
+    -o "${PREFIX}.sorted.bam"
+
+echo "Indexing BAM..."
+samtools index "${PREFIX}.sorted.bam"
+
+echo "=========================================="
+echo "DONE: ${SAMPLE_NAME}"
+echo "=========================================="
+echo "=========================================="
+echo "Alignment complete for ${SAMPLE_NAME}"
+echo "Output:"
+echo "  ${PREFIX}.sorted.bam"
+echo "  ${PREFIX}.sorted.bam.bai"
+echo "=========================================="
