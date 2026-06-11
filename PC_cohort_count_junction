@@ -19,3 +19,173 @@ clinical_data <- read_excel(clinical_file)
 
 #  correlation expression of AGR2-202, AGR2-202-short, and AGR2-203
 # =======================================================================================================================================================================================================================================================================================================================================================
+# ==============================
+library(dplyr)
+library(ggpubr)
+library(ggplot2)
+expr <- clinical_data %>%
+  select(
+    CPM_AGR2_202S,
+    CPM_AGR2_202L,
+    CPM_AGR2_203
+  ) %>%
+  na.omit()
+
+
+# Optional: log2 transformation for RNA-seq CPM
+# Uncomment if needed
+# expr <- log2(expr + 1)
+
+
+
+# ------------------------------------------
+# 2. Create correlation plots
+# Choose:
+# "pearson" or "spearman"
+# ------------------------------------------
+
+method <- "spearman"
+
+
+p1 <- ggscatter(
+  expr,
+  x = "CPM_AGR2_202S",
+  y = "CPM_AGR2_202L",
+  add = "reg.line",
+  conf.int = TRUE,
+  cor.coef = TRUE,
+  cor.method = method,
+  cor.coef.size = 5,
+  size = 3,
+  xlab = "AGR2-202S",
+  ylab = "AGR2-202L"
+) +
+  theme_classic(base_size = 14)
+
+
+
+p2 <- ggscatter(
+  expr,
+  x = "CPM_AGR2_202S",
+  y = "CPM_AGR2_203",
+  add = "reg.line",
+  conf.int = TRUE,
+  cor.coef = TRUE,
+  cor.method = method,
+  cor.coef.size = 5,
+  size = 3,
+  xlab = "AGR2-202S",
+  ylab = "AGR2-203"
+) +
+  theme_classic(base_size = 14)
+
+
+
+p3 <- ggscatter(
+  expr,
+  x = "CPM_AGR2_202L",
+  y = "CPM_AGR2_203",
+  add = "reg.line",
+  conf.int = TRUE,
+  cor.coef = TRUE,
+  cor.method = method,
+  cor.coef.size = 5,
+  size = 3,
+  xlab = "AGR2-202L",
+  ylab = "AGR2-203"
+) +
+  theme_classic(base_size = 14)
+
+
+
+# ------------------------------------------
+# 3. Combine plots
+# ------------------------------------------
+
+final_plot <- ggarrange(
+  p1,
+  p2,
+  p3,
+  ncol = 3,
+  labels = c("A", "B", "C"),
+  font.label = list(size = 16)
+)
+
+
+
+# ------------------------------------------
+# 4. Display plot
+# ------------------------------------------
+
+final_plot
+setwd("C:/Users/leh/OneDrive - TUNI.fi/Desktop/lncRNA_prostate_cancer/AGR2-202")
+ggexport(p1,filename = "AGR2L_AGR2S_correlation.tiff",width = 1500,height = 1500,res = 300)
+ggexport(p2,filename = "AGR3_AGR2S_correlation.tiff",width = 1500,height = 1500,res = 300)
+ggexport(p3,filename = "AGR3_AGR2L_correlation.tiff",width = 1500,height = 1500,res = 300)
+
+###1.	Kaplan-Meier plots of progression-free survival:
+###1.	Data needed: normalized expression, Progression, progression_free_months
+###1.	Divide samples into low and high expression. Start with median expression as a cutoff, but you can also use 1st quartile of 3rd quartile as a cutoff. 
+###1.	Use red color for high and blue color for low expression
+###1.	I have done these with GraphPad, but I think Mina has used R. So she probably can help you more, if you need help. I performed the analysis by placing the progression free months on the X axis and grouping the samples on the Y axis into two categories based on expression levels: low expression and high expression. Instead of using the expression values, put the Progression values (0 or 1) there instead.
+
+###1.	Kaplan-Meier plots of progression-free survival:
+###1.	Data needed: normalized expression, Progression, progression_free_months
+###1.	Divide samples into low and high expression. Start with median expression as a cutoff, but you can also use 1st quartile of 3rd quartile as a cutoff. 
+###1.	Use red color for high and blue color for low expression
+###1.	I have done these with GraphPad, but I think Mina has used R. So she probably can help you more, if you need help. I performed the analysis by placing the progression free months on the X axis and grouping the samples on the Y axis into two categories based on expression levels: low expression and high expression. Instead of using the expression values, put the Progression values (0 or 1) there instead.
+
+library(dplyr); library(survival); library(survminer); library(ggpubr)
+
+km_data <- clinical_data %>% select(`Progression (0=no, 1=yes)`, progression_free_months, CPM_AGR2_202S, CPM_AGR2_202L, CPM_AGR2_203) %>% na.omit() %>% rename(Progression=`Progression (0=no, 1=yes)`)
+
+make_KM_plot <- function(data,gene,gene_label){
+
+cutoff <- median(data[[gene]],na.rm=TRUE)
+
+data$Expression <- ifelse(data[[gene]]>cutoff,"High expression (> median)","Low expression (< median)")
+
+data$Expression <- factor(data$Expression,levels=c("Low expression (< median)","High expression (> median)"))
+
+fit <- survfit(Surv(progression_free_months,Progression)~Expression,data=data)
+
+ggsurvplot(fit,
+data=data,
+pval=TRUE,
+risk.table=FALSE,
+conf.int=FALSE,
+palette=c("blue","red"),
+legend.title=gene_label,
+legend.labs=c("Low expression (< median)","High expression (> median)"),
+legend=c(0.75,0.85),
+title=paste0(gene_label," progression-free survival"),
+xlab="Progression-free survival (months)",
+ylab="Survival probability",
+ggtheme=theme_classic(base_size=14))
+}
+
+KM_202S <- make_KM_plot(km_data,"CPM_AGR2_202S","AGR2-202S")
+KM_202L <- make_KM_plot(km_data,"CPM_AGR2_202L","AGR2-202L")
+KM_203 <- make_KM_plot(km_data,"CPM_AGR2_203","AGR2-203")
+
+KM_202S; KM_202L; KM_203
+
+final_KM <- ggarrange(KM_202S$plot,KM_202L$plot,KM_203$plot,labels=c("A","B","C"),ncol=3)
+
+final_KM
+
+ggexport(final_KM,filename="AGR2_KM_clean_legend.tiff",width=300,height=120,units="mm",dpi=600)
+
+ggexport(final_KM,filename="AGR2_KM_clean_legend.pdf",width=12,height=5)
+ggexport(KM_202S,filename = "KM_202S.tiff",width = 2500,height = 2000,res = 300)
+ggexport(KM_202L,filename = "KM_202L.tiff",width = 2500,height = 2000,res = 300)
+ggexport(KM_203,filename = "KM_203.tiff",width = 2500,height = 2000,res = 300)
+
+#==================================================================================================================================================================================================================================
+###1.	Multivariate Cox regression analysis:
+###1.	Data needed: normalized expression, Age_at_diagnosis, diagnostic_PSA, Gleason_score, pT
+###1.	Divide expression into high and low (as in Kaplan-Meier), PSA into three parts ( ≤10, 10-19.9, ≥20), Gleason score into three parts (<7, 7, >7). Age is continuous.
+###1.	Mina has done these analysis before in R: https://erc.bioscientifica.com/view/journals/erc/32/7/ERC-25-0070.xml. You can ask her about the details.
+###Data needed: normalized expression, Age_at_diagnosis, diagnostic_PSA, Gleason_score, pT
+###Divide expression into high and low (as in Kaplan-Meier), PSA into three parts ( ≤10, 10-19.9, ≥20), Gleason score into three parts (<7, 7, >7). Age is continuous.
+###But I forgot the explain the pT division. In the clinical data excel, there is pT (1=1, 2=2, 3=2a, 4=2b, 5=3a, 6=3b). This means that in the excel, pT 1 is marked as 1, pT 2 as 2, pT 2a as 3, and so on. pT ≥3 are more aggressive, so for the multivariate analysis people usually divide samples to pT ≤2, and pT ≥3. So in our case, pT ≤4 and pT ≥5.
