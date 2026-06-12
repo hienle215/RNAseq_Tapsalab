@@ -243,3 +243,72 @@ forest_plot <- ggforest(
 )
 
 print(forest_plot)
+
+##############################
+ merged_data <- merged_data %>%mutate(Gleason_group = cut(as.numeric(Gleason_score),breaks = c(-Inf, 6, 7, Inf),labels = c("<7", "7", ">7")))
+> merged_data <- merged_data %>%mutate( pT_group = case_when(
++  `pT (1=1, 2=2, 3=2a, 4=2b, 5=3a, 6=3b)` <= 4 
++       ~ "≤4",  
++       `pT (1=1, 2=2, 3=2a, 4=2b, 5=3a, 6=3b)` >= 5 
++       ~ "≥5",  
++       TRUE ~ NA_character_    ) )
+> merged_data$pT_group <- factor(merged_data$pT_group, levels = c("≤4","≥5"))
+> cox_data <- merged_data %>% 
++  filter(
++     !is.na(AGR2_202L_group),
++     !is.na(progression_free_months),
++     !is.na(`Progression (0=no, 1=yes)`),
++     !is.na(PSA_group),
++     !is.na(Gleason_group),
++     !is.na(pT_group)   )
+> cox_model <- coxph( Surv( progression_free_months,   
++     `Progression (0=no, 1=yes)`   
++   )
++   ~
++     AGR2_202L_group +
++     Age_at_diagnosis +
++     PSA_group +
++     Gleason_group +
++     pT_group,
++   data = cox_data)
+> summary(cox_model)
+Call:
+coxph(formula = Surv(progression_free_months, `Progression (0=no, 1=yes)`) ~ 
+    AGR2_202L_group + Age_at_diagnosis + PSA_group + Gleason_group + 
+        pT_group, data = cox_data)
+
+  n= 78, number of events= 55 
+
+                       coef exp(coef) se(coef)      z Pr(>|z|)   
+AGR2_202L_groupLow -0.35399   0.70188  0.28892 -1.225   0.2205   
+Age_at_diagnosis    0.07504   1.07793  0.03379  2.221   0.0263 * 
+PSA_group10-19.9    0.07914   1.08235  0.33778  0.234   0.8148   
+PSA_group≥20        1.37262   3.94566  0.42053  3.264   0.0011 **
+Gleason_group7      0.51652   1.67619  0.34840  1.483   0.1382   
+Gleason_group>7     0.92872   2.53127  0.38620  2.405   0.0162 * 
+pT_group≥5          0.55404   1.74028  0.28514  1.943   0.0520 . 
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+                   exp(coef) exp(-coef) lower .95 upper .95
+AGR2_202L_groupLow    0.7019     1.4247    0.3984     1.236
+Age_at_diagnosis      1.0779     0.9277    1.0089     1.152
+PSA_group10-19.9      1.0824     0.9239    0.5583     2.098
+PSA_group≥20          3.9457     0.2534    1.7305     8.997
+Gleason_group7        1.6762     0.5966    0.8468     3.318
+Gleason_group>7       2.5313     0.3951    1.1874     5.396
+pT_group≥5            1.7403     0.5746    0.9952     3.043
+
+Concordance= 0.713  (se = 0.038 )
+Likelihood ratio test= 27.44  on 7 df,   p=3e-04
+Wald test            = 26.55  on 7 df,   p=4e-04
+Score (logrank) test = 29.48  on 7 df,   p=1e-04
+
+> 
+> cox_data_forest <- as.data.frame(cox_data)
+> forest_plot <- ggforest( cox_model,data = cox_data_forest, main = "Multivariate Cox regression for AGR2-202L",cpositions = c(0.02, 0.22, 0.4),fontsize = 1,refLabel = "Reference")
+> print(forest_plot)
+> ggexport(forest_plot,filename = "forest_plot_COXanalysis_AGR2_202L.tiff",width = 2500,height = 2000,res = 300)
+file saved to forest_plot_COXanalysis_AGR2_202L.tiff
+> ggexport(forest_plot,filename = "forest_plot_COXanalysis_AGR2_202L_junction.tiff",width = 2500,height = 2000,res = 300)
+file saved to forest_plot_COXanalysis_AGR2_202L_junction.tiff
