@@ -189,3 +189,57 @@ ggexport(KM_203,filename = "KM_203.tiff",width = 2500,height = 2000,res = 300)
 ###Data needed: normalized expression, Age_at_diagnosis, diagnostic_PSA, Gleason_score, pT
 ###Divide expression into high and low (as in Kaplan-Meier), PSA into three parts ( ≤10, 10-19.9, ≥20), Gleason score into three parts (<7, 7, >7). Age is continuous.
 ###But I forgot the explain the pT division. In the clinical data excel, there is pT (1=1, 2=2, 3=2a, 4=2b, 5=3a, 6=3b). This means that in the excel, pT 1 is marked as 1, pT 2 as 2, pT 2a as 3, and so on. pT ≥3 are more aggressive, so for the multivariate analysis people usually divide samples to pT ≤2, and pT ≥3. So in our case, pT ≤4 and pT ≥5.
+
+library(dplyr)
+library(survival)
+library(survminer)
+
+merged_data <- clinical_data %>%
+  mutate(
+    AGR2_203_group = ifelse(CPM_AGR2_203 > median(CPM_AGR2_203, na.rm = TRUE), "High", "Low"),
+    PSA_group = cut(diagnostic_PSA,
+                    breaks = c(-Inf, 10, 19.9, Inf),
+                    labels = c("≤10", "10-19.9", "≥20")),
+    Gleason_group = cut(as.numeric(as.character(Gleason_score)),
+                        breaks = c(-Inf, 6, 7, Inf),
+                        labels = c("<7", "7", ">7")),
+    pT_group = case_when(
+      `pT (1=1, 2=2, 3=2a, 4=2b, 5=3a, 6=3b)` <= 4 ~ "≤4",
+      `pT (1=1, 2=2, 3=2a, 4=2b, 5=3a, 6=3b)` >= 5 ~ "≥5",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  mutate(pT_group = factor(pT_group, levels = c("≤4", "≥5")))
+
+cox_data <- merged_data %>%
+  filter(
+    !is.na(AGR2_203_group),
+    !is.na(progression_free_months),
+    !is.na(`Progression (0=no, 1=yes)`),
+    !is.na(PSA_group),
+    !is.na(Gleason_group),
+    !is.na(pT_group)
+  )
+
+cox_model <- coxph(
+  Surv(progression_free_months, `Progression (0=no, 1=yes)`) ~
+    AGR2_203_group +
+    Age_at_diagnosis +
+    PSA_group +
+    Gleason_group +
+    pT_group,
+  data = cox_data
+)
+
+summary(cox_model)
+
+forest_plot <- ggforest(
+  cox_model,
+  data = as.data.frame(cox_data),
+  main = "Multivariate Cox regression for AGR2-203",
+  cpositions = c(0.02, 0.22, 0.4),
+  fontsize = 1,
+  refLabel = "Reference"
+)
+
+print(forest_plot)
