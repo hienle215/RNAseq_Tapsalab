@@ -1,0 +1,85 @@
+### install sra in linux
+wget https://ftp-trace.ncbi.nlm.nih.gov/sra/sdk/current/sratoolkit.current-ubuntu64.tar.gz
+tar -xzf sratoolkit.current-ubuntu64.tar.gz
+
+### Set PATH (you already know the exact folder name from before)
+export PATH=$PATH:$PWD/sratoolkit.3.4.1-ubuntu64/bin
+which prefetch
+
+### (Optional but recommended) Configure SRA Toolkit
+vdb-config --interactive
+
+### Make an output directory
+mkdir -p fastq_output
+
+### downloading data
+prefetch SRR18026994
+prefetch SRR15335220
+prefetch SRR15335221
+prefetch SRR15335222
+prefetch SRR15335223
+prefetch SRR15335224
+prefetch SRR15335225
+prefetch SRR15335226
+prefetch SRR15335227
+prefetch SRR15335228
+prefetch SRR15335229
+prefetch SRR15335230
+prefetch SRR15335231
+prefetch SRR15335232
+prefetch SRR15335233
+prefetch SRR15335234
+prefetch SRR15335235
+prefetch SRR15335236
+prefetch SRR15335237
+prefetch SRR15335238
+prefetch SRR15335239
+prefetch SRR15335240
+prefetch SRR15335241
+prefetch SRR18026985
+prefetch SRR18026986
+prefetch SRR18026987
+prefetch SRR18026988
+prefetch SRR18026989
+prefetch SRR18026990
+prefetch SRR18026992
+prefetch SRR18026993
+prefetch SRR18026994
+prefetch SRR18026995
+prefetch SRR18026996
+
+### Convert to FASTQ
+fasterq-dump SRR18026994 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335220 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335221 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335222 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335223 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335224 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335225 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335226 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335227 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335228 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335229 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335230 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335231 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335232 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335233 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335234 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335235 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335236 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335237 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335238 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335239 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335240 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR15335241 --split-files -O ./fastq_output -e 8
+
+fasterq-dump SRR18026985 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR18026986 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR18026987 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR18026988 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR18026989 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR18026990 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR18026992 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR18026994 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR18026995 --split-files -O ./fastq_output -e 8
+fasterq-dump SRR18026996 --split-files -O ./fastq_output -e 8
